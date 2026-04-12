@@ -3,10 +3,10 @@ import numpy as np
 from model import FCN
 from sampling import sample_interior, sample_boundary, sample_initial
 
-# Constantes Físicas del Vacío en unidades del SI
-c = 3e8                           # Velocidad de la luz [m/s]
-mu0 = 4 * np.pi * 1e-7            # Permeabilidad magnética del vacío [H/m]
-eps0 = 1 / (mu0 * c**2)           # Permitividad eléctrica del vacío [F/m]
+# Constantes Físicas Normalizadas Adimensionalizadas
+c = 1.0                           # Velocidad normalizada
+mu0 = 1.0                         # Permeabilidad normalizada
+eps0 = 1.0                        # Permitividad normalizada
 L = 1.0                           # Longitud de la cavidad PEC [m]
 
 def compute_fields_and_derivatives(model, x, y, t):

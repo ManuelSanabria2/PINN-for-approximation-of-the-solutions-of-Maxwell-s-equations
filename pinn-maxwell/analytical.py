@@ -2,10 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-# Constantes Fundamentales
-c = 3e8                    # Velocidad de la luz [m/s]
-mu0 = 4 * np.pi * 1e-7     # Permeabilidad magnética del vacío [H/m]
-eps0 = 1 / (mu0 * c**2)    # Permitividad eléctrica del vacío [F/m]
+# Constantes Fundamentales (Unidades Naturales Adimensionales para PINNs)
+c = 1.0                    # Velocidad de la luz normalizada
+mu0 = 1.0                  # Permeabilidad magnética normalizada
+eps0 = 1.0                 # Permitividad eléctrica normalizada
 L = 1.0                    # Longitud de la cavidad [m]
 E0 = 1.0                   # Amplitud del campo eléctrico
 
