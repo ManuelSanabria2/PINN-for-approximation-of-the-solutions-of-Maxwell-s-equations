@@ -5,9 +5,9 @@ from model import FCN
 from sampling import sample_interior, sample_boundary, sample_initial
 from physics import total_loss
 
-def train_adam(model, n_epochs=10000, lr=1e-3,
-               N_col=5000, N_bc=200, N_ic=3000,
-               lambda_pde=1.0, lambda_bc=10.0, lambda_ic=10.0,
+def train_adam(model, n_epochs=15000, lr=1e-3,
+               N_col=15000, N_bc=400, N_ic=5000,
+               lambda_pde=1.0, lambda_bc=20.0, lambda_ic=20.0,
                device='cpu', verbose_every=1000):
     """
     Rutina de entrenamiento empleando el optimizador estocástico Adam.
@@ -18,6 +18,8 @@ def train_adam(model, n_epochs=10000, lr=1e-3,
     """
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    # Scheduler para decaimiento polinómico suave del Learning Rate
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3000, gamma=0.5)
     
     # 1. Puntos Estáticos (Frontera e Instante Incial)
     # Se obtienen una única vez antes del bucle para ahorrar coste de tensores.
@@ -39,6 +41,7 @@ def train_adam(model, n_epochs=10000, lr=1e-3,
         )
         L_tot.backward()
         optimizer.step()
+        scheduler.step()
         
         # 4. Registro y Métrica
         hist_entry = {
@@ -61,9 +64,9 @@ def train_adam(model, n_epochs=10000, lr=1e-3,
 
     return model, history
 
-def train_lbfgs(model, max_iter=1000,
-                N_col=5000, N_bc=200, N_ic=3000,
-                lambda_pde=1.0, lambda_bc=10.0, lambda_ic=10.0,
+def train_lbfgs(model, max_iter=2000,
+                N_col=15000, N_bc=400, N_ic=5000,
+                lambda_pde=1.0, lambda_bc=20.0, lambda_ic=20.0,
                 device='cpu'):
     """
     Optimización L-BFGS orientada a refinar el error post-Adam.
@@ -109,7 +112,7 @@ def train_lbfgs(model, max_iter=1000,
     optimizer.step(closure)
     return model, final_loss_val
 
-def train_full(model, adam_epochs=10000, lbfgs_iter=1000,
+def train_full(model, adam_epochs=15000, lbfgs_iter=2000,
                device='cpu', save_path='results/maxwell_pinn.pth'):
     """
     Aglutinador estático secuencial de optimización de pesos y biases Híbrido.

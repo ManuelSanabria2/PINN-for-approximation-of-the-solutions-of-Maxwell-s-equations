@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 
 # Constantes del Dominio
 L = 1.0           # Longitud de la cavidad PEC en metros
-T_MAX = 1.5e-8    # (Placeholder) 2 periodos a definir más adelante con exactitud
+# Si c=1, ky=pi, kx=pi -> omega = pi*sqrt(2). T = 2*pi/omega = sqrt(2). Dos periodos = 2*sqrt(2) = 2.828427
+T_MAX = 2.828427  # Cubrimos 2 periodos completos de oscilación
 
 def sample_interior(N=5000, device='cpu'):
     """
