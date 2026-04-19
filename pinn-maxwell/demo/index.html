@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cámara de Faraday Digital — PINN Maxwell TM₁₁</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <script type="importmap">
+    {"imports":{
+      "three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+      "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+    }}
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+    body {
+      background: #05050f;
+      color: #b8d4f8;
+      font-family: 'JetBrains Mono', monospace;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+
+    /* ── Top Bar ───────────────────────────────────────────────────────── */
+    #topbar {
+      position:fixed; top:0; left:0; right:0; z-index:100;
+      display:flex; align-items:center; gap:18px;
+      padding:10px 22px;
+      background:linear-gradient(to bottom,rgba(5,5,15,0.96) 0%,transparent 100%);
+      pointer-events:none;
+    }
+    #app-title {
+      font-family:'Orbitron',sans-serif; font-weight:900; font-size:13px;
+      letter-spacing:3px; color:#00ffff;
+      text-shadow:0 0 18px rgba(0,255,255,0.75);
+    }
+    .badge {
+      padding:2px 9px; border-radius:3px; font-size:10px;
+      font-weight:700; letter-spacing:1px; text-transform:uppercase;
+    }
+    .badge.pinn { background:rgba(0,255,100,0.12); border:1px solid #00ff80; color:#00ff80; }
+    .badge.analytical { background:rgba(255,210,0,0.12); border:1px solid #ffcc00; color:#ffcc00; }
+
+    .chip { font-size:11px; color:rgba(184,212,248,0.55); }
+    .chip b { color:#7ab8ff; font-weight:600; }
+
+    /* ── Control Panel ───────────────────────────────────────────────────── */
+    #ui {
+      position:fixed; top:52px; right:18px; width:252px; z-index:100;
+      background:rgba(4,6,18,0.88);
+      backdrop-filter:blur(18px);
+      border:1px solid rgba(0,255,255,0.18);
+      border-radius:14px;
+      padding:14px 16px;
+      box-shadow:0 8px 40px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .sec {
+      font-family:'Orbitron',sans-serif; font-size:9px; letter-spacing:2.5px;
+      color:rgba(0,255,255,0.45); text-transform:uppercase;
+      margin:10px 0 6px; border-bottom:1px solid rgba(0,255,255,0.1); padding-bottom:3px;
+    }
+    .sec:first-child { margin-top:0; }
+
+    .row {
+      display:flex; align-items:center; justify-content:space-between;
+      gap:6px; margin-bottom:5px;
+    }
+    .lbl { font-size:10px; color:rgba(184,212,248,0.65); flex-shrink:0; min-width:52px; }
+    .val { font-size:10px; color:#00e5ff; min-width:38px; text-align:right; flex-shrink:0; }
+
+    input[type=range] {
+      -webkit-appearance:none; appearance:none;
+      width:100%; height:3px; margin-bottom:6px;
+      background:rgba(0,255,255,0.12); border-radius:2px; outline:none; cursor:pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance:none; width:13px; height:13px; border-radius:50%;
+      background:#00e5ff; box-shadow:0 0 8px rgba(0,229,255,0.8); cursor:pointer;
+    }
+
+    .axis-grp { display:flex; gap:4px; margin-bottom:6px; }
+    .abtn {
+      flex:1; padding:4px 2px; text-align:center; cursor:pointer;
+      font-family:'Orbitron',sans-serif; font-size:8px; letter-spacing:0.5px;
+      background:rgba(0,255,255,0.04); border:1px solid rgba(0,255,255,0.18);
+      border-radius:4px; color:rgba(184,212,248,0.55); transition:all .18s;
+    }
+    .abtn.active {
+      background:rgba(0,255,255,0.14); border-color:#00e5ff;
+      color:#00e5ff; box-shadow:0 0 8px rgba(0,229,255,0.25);
+    }
+    .abtn:hover:not(.active) { background:rgba(0,255,255,0.07); color:rgba(184,212,248,0.85); }
+
+    #btn-play {
+      width:100%; padding:7px; margin-top:4px; cursor:pointer;
+      background:rgba(0,255,255,0.08); border:1px solid rgba(0,255,255,0.28);
+      border-radius:7px; color:#00e5ff; font-family:'Orbitron',sans-serif;
+      font-size:10px; letter-spacing:1px; transition:all .18s;
+    }
+    #btn-play:hover { background:rgba(0,255,255,0.18); }
+
+    .tog-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
+    .tog-lbl { font-size:10px; color:rgba(184,212,248,0.65); }
+    .tog { position:relative; width:34px; height:17px; flex-shrink:0; }
+    .tog input { opacity:0; width:0; height:0; }
+    .tslider {
+      position:absolute; inset:0; border-radius:9px; cursor:pointer;
+      background:rgba(0,255,255,0.08); border:1px solid rgba(0,255,255,0.2); transition:.3s;
+    }
+    .tslider::before {
+      content:''; position:absolute; left:2px; top:2px;
+      width:11px; height:11px; border-radius:50%;
+      background:rgba(0,229,255,0.35); transition:.3s;
+    }
+    .tog input:checked + .tslider { background:rgba(0,255,255,0.18); border-color:#00e5ff; }
+    .tog input:checked + .tslider::before {
+      transform:translateX(17px); background:#00e5ff;
+      box-shadow:0 0 6px rgba(0,229,255,0.8);
+    }
+
+    /* ── Colorbar ─────────────────────────────────────────────────────────── */
+    #colorbar {
+      position:fixed; bottom:40px; right:284px;
+      display:flex; flex-direction:column; align-items:center; gap:3px; z-index:100;
+    }
+    #cb-bar {
+      width:14px; height:110px; border-radius:3px;
+      background:linear-gradient(to top, #2166ac 0%, #f7f7f7 50%, #d6604d 100%);
+      border:1px solid rgba(255,255,255,0.1);
+    }
+    .cbl { font-size:9px; color:rgba(184,212,248,0.5); }
+
+    /* ── Bottom Bar ────────────────────────────────────────────────────────── */
+    #bot {
+      position:fixed; bottom:0; left:0; right:0; z-index:100; height:30px;
+      background:rgba(4,5,15,0.92); border-top:1px solid rgba(0,255,255,0.08);
+      display:flex; align-items:center; gap:20px; padding:0 22px;
+      font-size:10px; color:rgba(184,212,248,0.38);
+    }
+    #bot span { color:rgba(184,212,248,0.65); }
+    #bot .right { margin-left:auto; color:rgba(184,212,248,0.25); }
+
+    /* ── Instructions ────────────────────────────────────────────────────── */
+    #hint {
+      position:fixed; bottom:38px; left:20px; z-index:99;
+      font-size:10px; color:rgba(184,212,248,0.32); line-height:1.9;
+      pointer-events:none;
+    }
+    #hint b { color:rgba(120,180,248,0.6); }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- ── Top Bar ────────────────────────────────────────────────────────── -->
+<div id="topbar">
+  <div id="app-title">⚡ Cámara de Faraday Digital</div>
+  <div id="mode-badge" class="badge analytical">◌ Solución Analítica</div>
+  <div class="chip">Ez&nbsp;<b id="s-ez">0.000</b></div>
+  <div class="chip">|B|&nbsp;<b id="s-bm">0.000</b></div>
+  <div class="chip" style="margin-left:auto">FPS&nbsp;<b id="s-fps">60</b></div>
+</div>
+
+<!-- ── Control Panel ───────────────────────────────────────────────────── -->
+<div id="ui">
+  <div class="sec">⏱ Control Temporal</div>
+  <div class="row"><span class="lbl">Tiempo t</span><span class="val" id="v-t">0.000 s</span></div>
+  <input type="range" id="sl-t" min="0" max="2.828" step="0.004" value="0">
+  <div class="row"><span class="lbl">Velocidad</span><span class="val" id="v-sp">1.0×</span></div>
+  <input type="range" id="sl-sp" min="0.1" max="4" step="0.1" value="1">
+  <button id="btn-play">⏸ PAUSAR</button>
+
+  <div class="sec">✂ Plano de Corte</div>
+  <div class="axis-grp">
+    <div class="abtn active" data-axis="xy">XY (t)</div>
+    <div class="abtn" data-axis="xz">XT (y)</div>
+    <div class="abtn" data-axis="yz">YT (x)</div>
+  </div>
+  <div id="pos-row" class="row" style="display:none">
+    <span class="lbl">Posición</span><span class="val" id="v-pos">0.50</span>
+  </div>
+  <input type="range" id="sl-pos" min="0.02" max="0.98" step="0.01" value="0.5" style="display:none">
+  <div class="row"><span class="lbl">Resolución</span><span class="val" id="v-res">60</span></div>
+  <input type="range" id="sl-res" min="20" max="80" step="10" value="60">
+
+  <div class="sec">⚗ Propiedades del Medio</div>
+  <div class="row"><span class="lbl">ε_r</span><span class="val" id="v-eps">1.0</span></div>
+  <input type="range" id="sl-eps" min="1" max="10" step="0.25" value="1">
+  <div class="row"><span class="lbl">μ_r</span><span class="val" id="v-mu">1.0</span></div>
+  <input type="range" id="sl-mu" min="1" max="5" step="0.25" value="1">
+
+  <div class="sec">👁 Visibilidad</div>
+  <div class="tog-row">
+    <span class="tog-lbl">Malla Fantasma (IC)</span>
+    <label class="tog"><input type="checkbox" id="tog-ghost" checked><div class="tslider"></div></label>
+  </div>
+  <div class="tog-row">
+    <span class="tog-lbl">Vectores B</span>
+    <label class="tog"><input type="checkbox" id="tog-vec" checked><div class="tslider"></div></label>
+  </div>
+  <div class="tog-row">
+    <span class="tog-lbl">Marco PEC</span>
+    <label class="tog"><input type="checkbox" id="tog-box" checked><div class="tslider"></div></label>
+  </div>
+</div>
+
+<!-- ── Colorbar Ez ─────────────────────────────────────────────────────── -->
+<div id="colorbar">
+  <span class="cbl" id="cb-max">+1.00</span>
+  <div id="cb-bar"></div>
+  <span class="cbl" id="cb-min">−1.00</span>
+  <span class="cbl" style="margin-top:2px;color:rgba(184,212,248,0.3)">Ez</span>
+</div>
+
+<!-- ── Bottom Bar ─────────────────────────────────────────────────────── -->
+<div id="bot">
+  <span>Modo TM₁₁</span>
+  <span>| L = 1.0 m</span>
+  <span id="bd-om">| ω = π√2 rad/s</span>
+  <span>| Cavidad PEC 2D</span>
+  <div class="right">Drag: Rotar &nbsp;|&nbsp; Scroll: Zoom &nbsp;|&nbsp; Space: Play/Pause</div>
+</div>
+
+<!-- ── Hint ────────────────────────────────────────────────────────────── -->
+<div id="hint">
+  La red neuronal evalúa <b>∼3 600 puntos</b> por cuadro<br>
+  Solución <b>continua</b> — sin malla predefinida
+</div>
+
+<script type="module">
+import * as THREE           from 'three';
+import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CONSTANTES FÍSICAS
+// ═══════════════════════════════════════════════════════════════════════════
+const T_MAX  = 2.828427;               // 2 × Período TM₁₁ (u. naturales)
+const OMEGA  = Math.PI * Math.SQRT2;   // ω₁₁ = π√2 rad/s (u. naturales)
+const API    = 'http://localhost:8000';
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ═══════════════════════════════════════════════════════════════════════════
+const S = {
+  t: 0, axis: 'xy', position: 0.5,
+  eps_r: 1.0, mu_r: 1.0, speed: 1.0,
+  playing: true, showGhost: true, showVec: true, showBox: true,
+  resolution: 60, usePINN: false,
+  fetchPending: false, lastFetch: 0,
+  sliceData: null,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SOLUCIÓN ANALÍTICA — FALLBACK (calcula en el navegador sin servidor)
+// ═══════════════════════════════════════════════════════════════════════════
+const tEff = (t, e, m) => t / Math.sqrt(Math.max(e * m, 1e-9));
+
+function analyticalSlice(N, axis, pos, t, eps, mu) {
+  const te  = tEff(t, eps, mu);
+  const lin = Array.from({length: N}, (_, i) => i / (N - 1));
+  const Ez = [], Bx = [], By = [];
+  for (let j = 0; j < N; j++) {
+    const rEz=[], rBx=[], rBy=[];
+    for (let i = 0; i < N; i++) {
+      let x, y, te_ij = te;
+      if (axis === 'xy')      { x = lin[i]; y = lin[j]; }
+      else if (axis === 'xz') { x = lin[i]; y = pos;    te_ij = tEff(lin[j]*T_MAX, eps, mu); }
+      else                    { x = pos;    y = lin[j];  te_ij = tEff(lin[i]*T_MAX, eps, mu); }
+      rEz.push( Math.sin(Math.PI*x) * Math.sin(Math.PI*y) * Math.cos(OMEGA * te_ij));
+      rBx.push(-(Math.PI/OMEGA) * Math.sin(Math.PI*x) * Math.cos(Math.PI*y) * Math.sin(OMEGA * te_ij));
+      rBy.push( (Math.PI/OMEGA) * Math.cos(Math.PI*x) * Math.sin(Math.PI*y) * Math.sin(OMEGA * te_ij));
+    }
+    Ez.push(rEz); Bx.push(rBx); By.push(rBy);
+  }
+  return { Ez, Bx, By, t_eff: te };
+}
+
+function analyticalVectors(N, t, eps, mu) {
+  const te  = tEff(t, eps, mu);
+  const lin = Array.from({length: N}, (_, i) => (i + 0.5) / N);
+  const x=[], y=[], Ez=[], Bx=[], By=[];
+  for (const yi of lin) for (const xi of lin) {
+    x.push(xi); y.push(yi);
+    Ez.push( Math.sin(Math.PI*xi) * Math.sin(Math.PI*yi) * Math.cos(OMEGA*te));
+    Bx.push(-(Math.PI/OMEGA) * Math.sin(Math.PI*xi) * Math.cos(Math.PI*yi) * Math.sin(OMEGA*te));
+    By.push( (Math.PI/OMEGA) * Math.cos(Math.PI*xi) * Math.sin(Math.PI*yi) * Math.sin(OMEGA*te));
+  }
+  return {x, y, Ez, Bx, By};
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  API (PINN BACKEND)
+// ═══════════════════════════════════════════════════════════════════════════
+async function checkAPI() {
+  try {
+    const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(2000) });
+    if (r.ok) { S.usePINN = true; updateBadge(); }
+  } catch { S.usePINN = false; updateBadge(); }
+}
+
+async function fetchSlice() {
+  if (S.fetchPending) return;
+  S.fetchPending = true;
+  try {
+    if (S.usePINN) {
+      const r = await fetch(`${API}/slice`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          axis: S.axis, position: S.position, t: S.t,
+          N: S.resolution, eps_r: S.eps_r, mu_r: S.mu_r
+        }),
+        signal: AbortSignal.timeout(2500)
+      });
+      if (r.ok) { S.sliceData = await r.json(); }
+      else      { throw new Error(); }
+    } else { throw new Error(); }
+  } catch {
+    S.usePINN = false;
+    S.sliceData = analyticalSlice(S.resolution, S.axis, S.position, S.t, S.eps_r, S.mu_r);
+    updateBadge();
+  } finally { S.fetchPending = false; }
+}
+
+async function fetchVectors() {
+  try {
+    if (S.usePINN) {
+      const r = await fetch(`${API}/vectors`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({t:S.t, N:10, eps_r:S.eps_r, mu_r:S.mu_r}),
+        signal: AbortSignal.timeout(2500)
+      });
+      if (r.ok) return await r.json();
+    }
+  } catch { S.usePINN = false; updateBadge(); }
+  return analyticalVectors(10, S.t, S.eps_r, S.mu_r);
+}
+
+function updateBadge() {
+  const el = document.getElementById('mode-badge');
+  if (S.usePINN) { el.textContent = '● PINN Neural Network'; el.className = 'badge pinn'; }
+  else           { el.textContent = '◌ Solución Analítica';  el.className = 'badge analytical'; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  COLORMAP RdBu
+// ═══════════════════════════════════════════════════════════════════════════
+const B=[33,102,172], W=[247,247,247], R=[214,39,26];
+function rdbu(v, vmin, vmax) {
+  const t = Math.max(0, Math.min(1, (v - vmin) / (vmax - vmin || 1)));
+  const L = (a,b,u) => Math.round(a + (b-a)*u);
+  return t < 0.5
+    ? [L(B[0],W[0],t*2), L(B[1],W[1],t*2), L(B[2],W[2],t*2)]
+    : [L(W[0],R[0],(t-.5)*2), L(W[1],R[1],(t-.5)*2), L(W[2],R[2],(t-.5)*2)];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  THREE.JS SCENE SETUP
+// ═══════════════════════════════════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05050f);
+scene.fog        = new THREE.FogExp2(0x080818, 0.055);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.001, 200);
+camera.position.set(1.85, 1.45, 1.85);
+camera.lookAt(0.5, 0.5, 0.5);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0.5, 0.5, 0.5);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance   = 0.4;
+controls.maxDistance   = 7;
+
+// Lighting
+scene.add(new THREE.AmbientLight(0x182244, 3.5));
+const ptL1 = new THREE.PointLight(0x00e5ff, 2.5, 10);
+ptL1.position.set(1.6, 1.6, 1.6); scene.add(ptL1);
+const ptL2 = new THREE.PointLight(0xff6600, 1.8, 7);
+ptL2.position.set(-0.6, -0.3, 0.4); scene.add(ptL2);
+const ptL3 = new THREE.PointLight(0x8800ff, 1.0, 6);
+ptL3.position.set(0.5, -0.5, 1.5); scene.add(ptL3);
+
+// ─── PEC Wireframe Box ───────────────────────────────────────────────────
+const boxMat = new THREE.LineBasicMaterial({
+  color: 0x00e5ff, transparent: true, opacity: 0.75
+});
+const boxLine = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), boxMat);
+boxLine.position.set(0.5, 0.5, 0.5);
+scene.add(boxLine);
+
+// Corner spheres (capacitor nodes aesthetic)
+const cMat  = new THREE.MeshPhongMaterial({ color:0x00e5ff, emissive:0x003344, shininess:90 });
+const cGeom = new THREE.SphereGeometry(0.019, 8, 8);
+const corners = [];
+[[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]].forEach(([x,y,z]) => {
+  const s = new THREE.Mesh(cGeom, cMat); s.position.set(x,y,z); scene.add(s); corners.push(s);
+});
+
+// Floor grid
+const grid = new THREE.GridHelper(1, 10, 0x0d1530, 0x0d1530);
+grid.position.set(0.5, -0.001, 0.5);
+scene.add(grid);
+
+// Axis labels via CanvasTexture Sprites
+function makeLabel(txt) {
+  const cv = document.createElement('canvas'); cv.width=128; cv.height=48;
+  const cx = cv.getContext('2d');
+  cx.font = 'bold 26px Orbitron, monospace'; cx.fillStyle='#00e5ff';
+  cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(txt, 64, 24);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(cv), transparent:true }));
+  sp.scale.set(0.18, 0.07, 1); return sp;
+}
+const lbX = makeLabel('X →'); lbX.position.set(1.14, -0.04, 0); scene.add(lbX);
+const lbY = makeLabel('Y →'); lbY.position.set(0,    1.14, -0.04); scene.add(lbY);
+const lbT = makeLabel('t →'); lbT.position.set(-0.04, 0,   1.14); scene.add(lbT);
+
+// ─── Slice Plane ─────────────────────────────────────────────────────────
+let SLICE_N  = 60;
+let sliceArr = new Uint8Array(SLICE_N * SLICE_N * 3);
+let sliceTex = new THREE.DataTexture(sliceArr, SLICE_N, SLICE_N, THREE.RGBFormat);
+sliceTex.needsUpdate = true;
+
+const planeMat  = new THREE.MeshBasicMaterial({ map:sliceTex, side:THREE.DoubleSide, transparent:true, opacity:0.9 });
+const sliceMesh = new THREE.Mesh(new THREE.PlaneGeometry(1,1), planeMat);
+sliceMesh.position.set(0.5, 0.5, 0.5);
+scene.add(sliceMesh);
+
+// Glowing border on slice
+const borderMat  = new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:0.35 });
+const sliceBorder = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(1,1)), borderMat);
+sliceMesh.add(sliceBorder);
+
+// ─── B-Field Arrows (InstancedMesh) ──────────────────────────────────────
+const ARROW_N    = 10;
+const arrowCount = ARROW_N * ARROW_N;
+const arrowGeom  = new THREE.ConeGeometry(0.014, 0.068, 6);
+const arrowMat   = new THREE.MeshPhongMaterial({ shininess:50 });
+const arrowMesh  = new THREE.InstancedMesh(arrowGeom, arrowMat, arrowCount);
+arrowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(arrowMesh);
+
+// ─── Ghost Mesh (collocation points) ────────────────────────────────────
+const GHOST_N   = 900;
+const gPos      = new Float32Array(GHOST_N * 3);
+for (let i = 0; i < GHOST_N * 3; i++) gPos[i] = Math.random();
+const ghostGeom = new THREE.BufferGeometry();
+ghostGeom.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
+const ghostMat  = new THREE.PointsMaterial({
+  color:0x88aaff, size:0.013, transparent:true, opacity:0.25, sizeAttenuation:true
+});
+const ghostMesh = new THREE.Points(ghostGeom, ghostMat);
+scene.add(ghostMesh);
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SCENE UPDATE HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+const dummy  = new THREE.Object3D();
+const yUp    = new THREE.Vector3(0, 1, 0);
+const quat   = new THREE.Quaternion();
+const cLow   = new THREE.Color(0x551100);
+const cHi    = new THREE.Color(0xffee00);
+
+// Rebuild DataTexture if resolution changed
+function ensureTexSize(N) {
+  if (N === SLICE_N) return;
+  SLICE_N  = N;
+  sliceArr = new Uint8Array(N * N * 3);
+  sliceTex = new THREE.DataTexture(sliceArr, N, N, THREE.RGBFormat);
+  planeMat.map = sliceTex; planeMat.needsUpdate = true;
+}
+
+function applySliceData(data) {
+  if (!data) return;
+  const N = data.Ez.length;
+  ensureTexSize(N);
+
+  // Find symmetric range for colormap
+  let scale = 0.01;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++)
+    scale = Math.max(scale, Math.abs(data.Ez[j][i]));
+
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const idx = (j * N + i) * 3;
+    const [r,g,b] = rdbu(data.Ez[j][i], -scale, scale);
+    sliceArr[idx]=r; sliceArr[idx+1]=g; sliceArr[idx+2]=b;
+  }
+  sliceTex.needsUpdate = true;
+
+  // Colorbar labels
+  document.getElementById('cb-max').textContent = `+${scale.toFixed(2)}`;
+  document.getElementById('cb-min').textContent = `−${scale.toFixed(2)}`;
+
+  // Stats: center of domain
+  const mid = Math.floor(N / 2);
+  const ez  = data.Ez[mid][mid];
+  const bm  = Math.sqrt((data.Bx[mid][mid]||0)**2 + (data.By[mid][mid]||0)**2);
+  document.getElementById('s-ez').textContent = ez.toFixed(3);
+  document.getElementById('s-bm').textContent = bm.toFixed(3);
+}
+
+function applyVectorData(data) {
+  const visible = S.showVec && S.axis === 'xy';
+  arrowMesh.visible = visible;
+  if (!visible || !data) return;
+
+  const sliceZ = S.t / T_MAX;
+  const mags   = data.x.map((_,i) => Math.sqrt(data.Bx[i]**2 + data.By[i]**2));
+  const maxMag = Math.max(...mags, 1e-6);
+
+  for (let i = 0; i < Math.min(data.x.length, arrowCount); i++) {
+    dummy.position.set(data.x[i], data.y[i], sliceZ + 0.004);
+    const mag = mags[i];
+    if (mag > 5e-4) {
+      quat.setFromUnitVectors(yUp, new THREE.Vector3(data.Bx[i], data.By[i], 0).normalize());
+      dummy.quaternion.copy(quat);
+    }
+    dummy.scale.setScalar(0.55 + (mag / maxMag) * 1.6);
+    dummy.updateMatrix();
+    arrowMesh.setMatrixAt(i, dummy.matrix);
+    arrowMesh.setColorAt(i, new THREE.Color().lerpColors(cLow, cHi, mag / maxMag));
+  }
+  if (arrowMesh.instanceColor) arrowMesh.instanceColor.needsUpdate = true;
+  arrowMesh.instanceMatrix.needsUpdate = true;
+}
+
+// Slice position & orientation based on current axis
+function updateSliceTransform() {
+  switch (S.axis) {
+    case 'xy':
+      sliceMesh.position.set(0.5, 0.5, S.t / T_MAX);
+      sliceMesh.rotation.set(0, 0, 0);
+      break;
+    case 'xz':                           // XY rotated -90° around X → XZ plane
+      sliceMesh.position.set(0.5, S.position, 0.5);
+      sliceMesh.rotation.set(-Math.PI / 2, 0, 0);
+      break;
+    case 'yz':                           // XY rotated -90° around Y → YZ plane
+      sliceMesh.position.set(S.position, 0.5, 0.5);
+      sliceMesh.rotation.set(0, -Math.PI / 2, 0);
+      break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ANIMATION LOOP
+// ═══════════════════════════════════════════════════════════════════════════
+let prevT  = performance.now();
+let frames = 0, fpsT = performance.now();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt  = Math.min((now - prevT) / 1000, 0.05);
+  prevT = now;
+
+  // FPS
+  frames++;
+  if (now - fpsT > 600) {
+    document.getElementById('s-fps').textContent = Math.round(frames * 1000 / (now - fpsT));
+    frames = 0; fpsT = now;
+  }
+
+  // Advance time
+  if (S.playing) {
+    S.t += dt * S.speed * 0.75;
+    if (S.t > T_MAX) S.t -= T_MAX;
+    document.getElementById('v-t').textContent = S.t.toFixed(3) + ' s';
+    if (!document.getElementById('sl-t').matches(':active'))
+      document.getElementById('sl-t').value = S.t;
+  }
+
+  // Fetch new field data every ~90ms
+  if (!S.fetchPending && (now - S.lastFetch > 90)) {
+    S.lastFetch = now;
+    fetchSlice().then(() => applySliceData(S.sliceData));
+    if (S.axis === 'xy')
+      fetchVectors().then(d => applyVectorData(d));
+    else
+      applyVectorData(null);
+  }
+
+  // Animate slice plane transform
+  updateSliceTransform();
+
+  // Ghost pulsation
+  ghostMat.opacity = S.showGhost ? (0.16 + 0.09 * Math.sin(now * 0.0024)) : 0;
+
+  // Box edge glow animation
+  const glow = 0.72 + 0.22 * Math.sin(now * 0.0009);
+  boxMat.opacity = S.showBox ? glow : 0;
+  corners.forEach(s => s.visible = S.showBox);
+
+  // Point light breathing
+  ptL1.intensity = 2.2 + 0.8 * Math.sin(now * 0.0011);
+  ptL2.intensity = 1.5 + 0.5 * Math.cos(now * 0.0013);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI — Event Handlers
+// ═══════════════════════════════════════════════════════════════════════════
+function invalidate() { S.sliceData = null; S.lastFetch = 0; }
+
+document.getElementById('sl-t').addEventListener('input', e => {
+  S.t = parseFloat(e.target.value);
+  document.getElementById('v-t').textContent = S.t.toFixed(3) + ' s';
+  invalidate();
+});
+
+document.getElementById('sl-sp').addEventListener('input', e => {
+  S.speed = parseFloat(e.target.value);
+  document.getElementById('v-sp').textContent = `${S.speed.toFixed(1)}×`;
+});
+
+document.getElementById('btn-play').addEventListener('click', () => {
+  S.playing = !S.playing;
+  document.getElementById('btn-play').textContent = S.playing ? '⏸ PAUSAR' : '▶ REPRODUCIR';
+});
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); document.getElementById('btn-play').click(); }
+});
+
+document.querySelectorAll('.abtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.abtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    S.axis = btn.dataset.axis;
+    const show = S.axis !== 'xy';
+    document.getElementById('pos-row').style.display = show ? 'flex' : 'none';
+    document.getElementById('sl-pos').style.display  = show ? 'block': 'none';
+    invalidate();
+  });
+});
+
+document.getElementById('sl-pos').addEventListener('input', e => {
+  S.position = parseFloat(e.target.value);
+  document.getElementById('v-pos').textContent = S.position.toFixed(2);
+  invalidate();
+});
+
+document.getElementById('sl-res').addEventListener('input', e => {
+  S.resolution = parseInt(e.target.value);
+  document.getElementById('v-res').textContent = S.resolution;
+  invalidate();
+});
+
+const updateOmega = () => {
+  const oe = (OMEGA / Math.sqrt(S.eps_r * S.mu_r)).toFixed(3);
+  document.getElementById('bd-om').textContent = `| ω_eff = ${oe} rad/s`;
+};
+
+document.getElementById('sl-eps').addEventListener('input', e => {
+  S.eps_r = parseFloat(e.target.value);
+  document.getElementById('v-eps').textContent = S.eps_r.toFixed(2);
+  updateOmega(); invalidate();
+});
+
+document.getElementById('sl-mu').addEventListener('input', e => {
+  S.mu_r = parseFloat(e.target.value);
+  document.getElementById('v-mu').textContent = S.mu_r.toFixed(2);
+  updateOmega(); invalidate();
+});
+
+document.getElementById('tog-ghost').addEventListener('change', e => { S.showGhost = e.target.checked; });
+document.getElementById('tog-vec').addEventListener('change',   e => { S.showVec   = e.target.checked; });
+document.getElementById('tog-box').addEventListener('change',   e => { S.showBox   = e.target.checked; });
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════════════════════
+// Initial render with analytical solution while API check runs
+S.sliceData = analyticalSlice(S.resolution, S.axis, S.position, S.t, S.eps_r, S.mu_r);
+applySliceData(S.sliceData);
+applyVectorData(analyticalVectors(10, S.t, S.eps_r, S.mu_r));
+
+// Check API availability (silently upgrades to PINN mode if available)
+checkAPI();
+
+animate();
+</script>
+</body>
+</html>
