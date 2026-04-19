@@ -1,4 +1,4 @@
-# ⚡ PINN para Ecuaciones de Maxwell — Cámara de Faraday Digital
+#  PINN para Ecuaciones de Maxwell — Cámara de Faraday Digital
 
 > **Red Neuronal Informada por la Física (PINN)** que aproxima la solución analítica exacta de las Ecuaciones de Maxwell en una cavidad rectangular PEC 2D, con demo interactiva 3D en tiempo real.
 
@@ -10,7 +10,7 @@
 
 ---
 
-## 🎯 ¿Qué resuelve este proyecto?
+##  ¿Qué resuelve este proyecto?
 
 La PINN aprende a resolver las **Ecuaciones de Maxwell** en modo TM₁₁ para una cavidad rectangular con condiciones de contorno PEC (Perfect Electric Conductor):
 
@@ -22,7 +22,7 @@ $$\frac{\partial B_x}{\partial t} = -\frac{\partial E_z}{\partial y}, \quad \fra
 
 ---
 
-## 🏆 Resultados
+##  Resultados
 
 | Métrica | Antes | Después |
 |---|---|---|
@@ -33,7 +33,7 @@ $$\frac{\partial B_x}{\partial t} = -\frac{\partial E_z}{\partial y}, \quad \fra
 
 ---
 
-## 🚀 Demo Interactiva — Cámara de Faraday Digital
+##  Demo Interactiva — Cámara de Faraday Digital
 
 Una visualización 3D inmersiva donde el usuario interroga al modelo en tiempo real.
 
@@ -71,7 +71,7 @@ uvicorn server:app --port 8000
 
 ---
 
-## 🧠 Arquitectura de la Red
+##  Arquitectura de la Red
 
 ```
 Entrada: (x, y, t) ∈ [0,1]×[0,1]×[0,T]
@@ -97,11 +97,11 @@ Salida: (Ez, Bx, By) — los 3 campos electromagnéticos
 
 ---
 
-## 📁 Estructura del Proyecto
+##  Estructura del Proyecto
 
 ```
-📦 PINN-Maxwell/
-├── 📂 pinn-maxwell/
+ PINN-Maxwell/
+├──  pinn-maxwell/
 │   ├── main.py          # Punto de entrada — pipeline completo
 │   ├── model.py         # Arquitectura FCN con Fourier Features
 │   ├── train.py         # Entrenamiento Adam + L-BFGS
@@ -110,13 +110,13 @@ Salida: (Ez, Bx, By) — los 3 campos electromagnéticos
 │   ├── analytical.py    # Solución analítica exacta TM₁₁
 │   ├── metrics.py       # Evaluación L2, energía, BC, IC (GPU-compatible)
 │   ├── visualization.py # Gráficas científicas (GPU-compatible)
-│   ├── server.py        # 🆕 FastAPI backend para la demo 3D
+│   ├── server.py        # FastAPI backend para la demo 3D
 │   ├── higher_mode.py   # Modo experimental TM₂₁
 │   ├── sensitivity.py   # Análisis de sensibilidad de hiperparámetros
-│   └── 📂 demo/
-│       ├── index.html   # 🆕 Cámara de Faraday Digital (Three.js)
+│   └──  demo/
+│       ├── index.html   #  Cámara de Faraday Digital (Three.js)
 │       └── README.md    # Instrucciones de la demo
-├── 📂 results/
+├──  results/
 │   ├── maxwell_pinn.pth # Modelo entrenado
 │   └── training_log.txt # Log de entrenamiento
 └── README.md            # Este archivo
@@ -124,7 +124,7 @@ Salida: (Ez, Bx, By) — los 3 campos electromagnéticos
 
 ---
 
-## 🏋️ Entrenamiento desde Cero
+##  Entrenamiento desde Cero
 
 ```bash
 cd pinn-maxwell
@@ -159,7 +159,7 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 ---
 
-## 🎓 ¿Qué se puede demostrar con la demo?
+##  ¿Qué se puede demostrar con la demo?
 
 ### 1. Solución sin Malla
 La PINN evalúa (x, y, t) → (Ez, Bx, By) en cualquier punto continuo del dominio  
@@ -179,7 +179,7 @@ El eje Z del cubo = tiempo t ∈ [0, T_MAX]
 
 ---
 
-## 📚 Referencias
+##  Referencias
 
 - Raissi, M., Perdikaris, P., & Karniadakis, G. E. (2019). *Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations.* Journal of Computational Physics.
 - Tancik, M. et al. (2020). *Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains.* NeurIPS.
@@ -187,7 +187,7 @@ El eje Z del cubo = tiempo t ∈ [0, T_MAX]
 
 ---
 
-## 👨‍💻 Autor
+##  Autor
 
 **Manuel Sanabria** — Proyecto de investigación universitaria  
 Aproximación de Ecuaciones de Maxwell con Redes Neuronales Informadas por la Física
