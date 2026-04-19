@@ -38,7 +38,8 @@ def compare_modes(modes=[(1,1), (2,1), (1,2)], save_path='results/'):
         # Un modo TM_mn asume 'm' variaciones de media onda en el eje x y 'n' en y.
         print(f"TM_{m}{n}  |     {freq_GHz:5.2f}        |       {wavelength:5.2f}          |     {m}      |     {n}")
 
-def train_higher_mode(m=2, n=1, adam_epochs=15000, lbfgs_iter=1000, device='cpu'):
+def train_higher_mode(m=2, n=1, adam_epochs=15000, lbfgs_iter=1000, device='cpu',
+                      fourier_features=True, n_fourier=32, sigma=1.0):
     """
     Compila y entrena arquitecturas extendidas para resonadores complejos TM_mn.
     
@@ -47,9 +48,16 @@ def train_higher_mode(m=2, n=1, adam_epochs=15000, lbfgs_iter=1000, device='cpu'
     el código de physics.py estático original enfocado en TM11. En su lugar, hacemos 
     un monkey-patching sobre la condición inicial inyectándola globalmente solo 
     durante el frame de ejecución de esta función.
+    
+    Los parámetros fourier_features, n_fourier y sigma se propagan al FCN
+    para mantener consistencia con la arquitectura mejorada del modo base TM11.
     """
-    # 1. Arquitectura Extendida (De 4 a 5 capas ocultas de 128 para poder mapear la severidad modal superior)
-    model = FCN([3, 128, 128, 128, 128, 128, 3])
+    # 1. Arquitectura Extendida con Fourier Feature Encoding
+    # 5 capas ocultas de 128 para capturar la mayor severidad de los armónicos superiores
+    model = FCN([3, 128, 128, 128, 128, 128, 3],
+                fourier_features=fourier_features,
+                n_fourier=n_fourier,
+                sigma=sigma)
     
     # 2. Monkey-Patch a la condición inicial de la gravedad de physics original 
     original_initial_loss = physics.initial_loss
@@ -150,7 +158,8 @@ if __name__ == '__main__':
         # Para hacer la iteración exigida en las instrucciones creamos una pequeña de TM11 también 
         # (simulando que main.py ya la tenía generada)
         print("\nLevantando dummy TM11 para la comparativa óptica...")
-        mod_11 = FCN([3, 128, 128, 128, 128, 3]) # Layer base TM11
+        mod_11 = FCN([3, 128, 128, 128, 128, 3],
+                     fourier_features=True, n_fourier=32, sigma=1.0)  # Layer base TM11
         
         print("\n--- 3. COMPARATIVA ESPECTRAL MATRICIAL ---")
         compare_predictions(mod_11, mod_21, t_val=0.0)

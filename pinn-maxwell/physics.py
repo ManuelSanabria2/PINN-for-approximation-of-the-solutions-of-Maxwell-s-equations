@@ -133,7 +133,7 @@ def initial_loss(model, x_ic, y_ic, t_ic, E0=1.0, L=1.0):
     return mse_Ez + mse_Bx + mse_By
 
 def total_loss(model, x_col, y_col, t_col, boundary_points, x_ic, y_ic, t_ic,
-               lambda_pde=1.0, lambda_bc=10.0, lambda_ic=10.0):
+               lambda_pde=1.0, lambda_bc=10.0, lambda_ic=10.0, lambda_gauss=2.0):
     """
     Asimila y concentra los 3 grandes macro-errores que rigen a la red, ponderándolos.
     
@@ -149,8 +149,9 @@ def total_loss(model, x_col, y_col, t_col, boundary_points, x_ic, y_ic, t_ic,
     mse_faraday_y = torch.mean(torch.square(res_dict['faraday_y']))
     mse_ampere = torch.mean(torch.square(res_dict['ampere']))
     mse_gauss = torch.mean(torch.square(res_dict['gauss_b']))
-    
-    loss_pde = mse_faraday_x + mse_faraday_y + mse_ampere + mse_gauss
+
+    # Gauss B recibe peso extra (lambda_gauss) para reforzar ∇·B = 0
+    loss_pde = mse_faraday_x + mse_faraday_y + mse_ampere + (lambda_gauss * mse_gauss)
     
     # 2. Error Frontera (Bordes PEC) y Origen (t=0)
     loss_bc = boundary_loss(model, boundary_points)
@@ -158,6 +159,7 @@ def total_loss(model, x_col, y_col, t_col, boundary_points, x_ic, y_ic, t_ic,
     
     # 3. Sumatoria
     L_total = (lambda_pde * loss_pde) + (lambda_bc * loss_bc) + (lambda_ic * loss_ic)
+    # Nota: lambda_gauss ya está integrado dentro de loss_pde
     
     # Pre-formateo individual para debug en terminales o notebooks
     dict_residuals = {

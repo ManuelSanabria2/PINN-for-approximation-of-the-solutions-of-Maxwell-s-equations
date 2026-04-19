@@ -11,6 +11,10 @@ plt.style.use('seaborn-v0_8-whitegrid')
 def safe_makedirs(save_path):
     os.makedirs(save_path, exist_ok=True)
 
+def get_model_device(model):
+    """Detecta el device donde vive el modelo (CPU o CUDA)."""
+    return next(model.parameters()).device
+
 def calc_l2_error(pred, exact):
     """Calcula la métrica escalar relativa Norma L2 para títulos gráficos."""
     pred_vec = pred.flatten()
@@ -23,15 +27,16 @@ def plot_fields_snapshot(model, t_val, N=100, save_path='results/'):
     para Ez, Bx, y By simultáneamente en el plano bidimensional en un t dado.
     """
     safe_makedirs(save_path)
+    device = get_model_device(model)
     
     # 1. Preparar Grid
     x_lin = np.linspace(0, L, N)
     y_lin = np.linspace(0, L, N)
     X, Y = np.meshgrid(x_lin, y_lin, indexing='ij')
     
-    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1)
-    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1)
-    t_t = torch.tensor(np.full_like(X.flatten(), t_val), dtype=torch.float32).unsqueeze(1)
+    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    t_t = torch.tensor(np.full_like(X.flatten(), t_val), dtype=torch.float32).unsqueeze(1).to(device)
     
     # 2. Evaluación del Ground Truth (Analítico)
     Ez_anal = Ez_exact(X, Y, t_val).reshape(N, N)
@@ -42,9 +47,9 @@ def plot_fields_snapshot(model, t_val, N=100, save_path='results/'):
     with torch.no_grad():
         preds = model(x_t, y_t, t_t)
         # Recordar que FCN retorna lista [Ez, Bx, By]
-        Ez_pinn = preds[0].numpy().reshape(N, N)
-        Bx_pinn = preds[1].numpy().reshape(N, N)
-        By_pinn = preds[2].numpy().reshape(N, N)
+        Ez_pinn = preds[0].cpu().numpy().reshape(N, N)
+        Bx_pinn = preds[1].cpu().numpy().reshape(N, N)
+        By_pinn = preds[2].cpu().numpy().reshape(N, N)
         
     # 4. Cálculo Errores L2 Relativo
     err_Ez = calc_l2_error(Ez_pinn, Ez_anal)
@@ -101,19 +106,22 @@ def plot_time_evolution(model, x_probe=0.5, y_probe=0.5, N_t=200, save_path='res
     comparando los armónicos senoidales exactos vs la regresión de la PINN.
     """
     safe_makedirs(save_path)
+    device = get_model_device(model)
     
     params = cavity_mode(1, 1)
     T_max = 2.0 * params['T_period']
     t_lin = np.linspace(0, T_max, N_t)
     
     # Convertir a tensores torch
-    x_t = torch.full((N_t, 1), x_probe, dtype=torch.float32)
-    y_t = torch.full((N_t, 1), y_probe, dtype=torch.float32)
-    t_t = torch.tensor(t_lin, dtype=torch.float32).unsqueeze(1)
+    x_t = torch.full((N_t, 1), x_probe, dtype=torch.float32).to(device)
+    y_t = torch.full((N_t, 1), y_probe, dtype=torch.float32).to(device)
+    t_t = torch.tensor(t_lin, dtype=torch.float32).unsqueeze(1).to(device)
     
     with torch.no_grad():
         preds = model(x_t, y_t, t_t)
-        Ez_pinn, Bx_pinn, By_pinn = preds[0].numpy().flatten(), preds[1].numpy().flatten(), preds[2].numpy().flatten()
+        Ez_pinn = preds[0].cpu().numpy().flatten()
+        Bx_pinn = preds[1].cpu().numpy().flatten()
+        By_pinn = preds[2].cpu().numpy().flatten()
         
     Ez_anal = Ez_exact(x_probe, y_probe, t_lin, 1, 1)
     Bx_anal = Bx_exact(x_probe, y_probe, t_lin, 1, 1)
@@ -152,6 +160,7 @@ def plot_electromagnetic_energy(model, N=80, N_t=50, save_path='results/'):
     u(x,y,t) = ½*ε₀*|Ez|² + (1/2*μ₀)*(|Bx|² + |By|²)
     """
     safe_makedirs(save_path)
+    device = get_model_device(model)
     
     params = cavity_mode(1, 1)
     T = params['T_period']
@@ -162,8 +171,8 @@ def plot_electromagnetic_energy(model, N=80, N_t=50, save_path='results/'):
     dx, dy = x_lin[1]-x_lin[0], y_lin[1]-y_lin[0]
     
     X, Y = np.meshgrid(x_lin, y_lin, indexing='ij')
-    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1)
-    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1)
+    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
     
     U_total = []
     
@@ -172,7 +181,9 @@ def plot_electromagnetic_energy(model, N=80, N_t=50, save_path='results/'):
         with torch.no_grad():
             t_curr = torch.full_like(x_t, t_step)
             preds = model(x_t, y_t, t_curr)
-            Ez_i, Bx_i, By_i = preds[0].numpy().flatten(), preds[1].numpy().flatten(), preds[2].numpy().flatten()
+            Ez_i = preds[0].cpu().numpy().flatten()
+            Bx_i = preds[1].cpu().numpy().flatten()
+            By_i = preds[2].cpu().numpy().flatten()
             
             # Formular la densidad local de la energía (Densidad Escalar en el nodo)
             u_density = 0.5 * eps0 * (Ez_i**2) + (0.5 / mu0) * (Bx_i**2 + By_i**2)
@@ -275,21 +286,22 @@ def plot_field_lines(model, t_val, N=30, save_path='results/'):
     Streamlines y flujos para el tensor Magnético B.
     """
     safe_makedirs(save_path)
+    device = get_model_device(model)
     
     x_lin = np.linspace(0, L, N)
     y_lin = np.linspace(0, L, N)
     X, Y = np.meshgrid(x_lin, y_lin)
     
     # Tensores para pase inferencial
-    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1)
-    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1)
-    t_t = torch.tensor(np.full_like(X.flatten(), t_val), dtype=torch.float32).unsqueeze(1)
+    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    t_t = torch.tensor(np.full_like(X.flatten(), t_val), dtype=torch.float32).unsqueeze(1).to(device)
     
     with torch.no_grad():
         preds = model(x_t, y_t, t_t)
-        Ez = preds[0].numpy().reshape(N, N)
-        Bx = preds[1].numpy().reshape(N, N)
-        By = preds[2].numpy().reshape(N, N)
+        Ez = preds[0].cpu().numpy().reshape(N, N)
+        Bx = preds[1].cpu().numpy().reshape(N, N)
+        By = preds[2].cpu().numpy().reshape(N, N)
         
     B_mag = np.sqrt(Bx**2 + By**2)
     if B_mag.max() == 0: B_mag += 1e-12

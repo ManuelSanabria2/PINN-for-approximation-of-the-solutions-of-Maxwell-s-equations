@@ -6,10 +6,16 @@ from analytical import Ez_exact, Bx_exact, By_exact, cavity_mode, L, eps0, mu0
 from sampling import sample_interior, sample_boundary, sample_initial
 from physics import maxwell_residuals
 
+
+def get_model_device(model):
+    """Detecta el device donde vive el modelo (CPU o CUDA)."""
+    return next(model.parameters()).device
+
 def l2_error_per_field(model, N=50, N_t=20):
     """
     Evalúa el error relativo L2 porcentual para los 3 campos a lo largo del tiempo.
     """
+    device = get_model_device(model)
     params = cavity_mode(1, 1)
     T_max = 2.0 * params['T_period']
     
@@ -18,13 +24,13 @@ def l2_error_per_field(model, N=50, N_t=20):
     t_lin = np.linspace(0, T_max, N_t)
     X, Y, Time = np.meshgrid(x_lin, y_lin, t_lin, indexing='ij')
     
-    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1)
-    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1)
-    t_t = torch.tensor(Time.flatten(), dtype=torch.float32).unsqueeze(1)
+    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    t_t = torch.tensor(Time.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
     
     with torch.no_grad():
         preds = model(x_t, y_t, t_t)
-        Ez_p, Bx_p, By_p = preds[0], preds[1], preds[2]
+        Ez_p, Bx_p, By_p = preds[0].cpu(), preds[1].cpu(), preds[2].cpu()
         
     Ez_anal = torch.tensor(Ez_exact(X, Y, Time, 1, 1).flatten(), dtype=torch.float32).unsqueeze(1)
     Bx_anal = torch.tensor(Bx_exact(X, Y, Time, 1, 1).flatten(), dtype=torch.float32).unsqueeze(1)
@@ -44,7 +50,8 @@ def residual_per_equation(model, N_test=8000):
     Verifica cuánto se "violan" las ecuaciones de Maxwell en puntos de evaluación.
     Requires Grad debe estar activo para permitir la derivación matemática del autograd.
     """
-    x_t, y_t, t_t = sample_interior(N=N_test, device='cpu')
+    device = get_model_device(model)
+    x_t, y_t, t_t = sample_interior(N=N_test, device=device)
     res_dict = maxwell_residuals(model, x_t, y_t, t_t)
     
     out = {}
@@ -61,14 +68,15 @@ def boundary_error(model, N_per_side=500):
     Constata que la condición Perfect Electric Conductor (Ez = 0)
     se mantenga sólida a lo largo de todas las fronteras espaciales.
     """
-    bp = sample_boundary(N_per_side=N_per_side, device='cpu')
+    device = get_model_device(model)
+    bp = sample_boundary(N_per_side=N_per_side, device=device)
     errs = []
     
     with torch.no_grad():
         for side in ['left', 'right', 'bottom', 'top']:
             x_b, y_b, t_b = bp[side]
             Ez_b, _, _ = model(x_b, y_b, t_b)
-            errs.append(torch.abs(Ez_b))
+            errs.append(torch.abs(Ez_b).cpu())
             
     all_errs = torch.cat(errs)
     return {
@@ -80,12 +88,19 @@ def initial_condition_error(model, N=3000):
     """
     Valida las IC de los campos a lo largo de L2.
     """
-    x_ic, y_ic, t_ic = sample_initial(N=N, device='cpu')
+    device = get_model_device(model)
+    x_ic, y_ic, t_ic = sample_initial(N=N, device=device)
     
     with torch.no_grad():
         Ez_p, Bx_p, By_p = model(x_ic, y_ic, t_ic)
+        Ez_p  = Ez_p.cpu()
+        Bx_p  = Bx_p.cpu()
+        By_p  = By_p.cpu()
+        x_np  = x_ic.cpu().numpy()
+        y_np  = y_ic.cpu().numpy()
+        t_np  = t_ic.cpu().numpy()
         
-    Ez_anal = torch.tensor(Ez_exact(x_ic.numpy(), y_ic.numpy(), t_ic.numpy(), 1, 1), dtype=torch.float32)
+    Ez_anal = torch.tensor(Ez_exact(x_np, y_np, t_np, 1, 1), dtype=torch.float32)
     Bx_anal = torch.zeros_like(Ez_p)
     By_anal = torch.zeros_like(Ez_p)
     
@@ -103,9 +118,10 @@ def initial_condition_error(model, N=3000):
 
 def energy_conservation_error(model, N=40, N_t=30):
     """
-    Calcula la variación térmica asincrónica (Conservación Energética Térmica)
+    Calcula la variación térmica asincronica (Conservación Energética Térmica)
     U(t) = ∫∫ u(x,y,t) dxdy
     """
+    device = get_model_device(model)
     params = cavity_mode(1, 1)
     T_max = 2.0 * params['T_period']
     
@@ -115,8 +131,8 @@ def energy_conservation_error(model, N=40, N_t=30):
     dx, dy = x_lin[1]-x_lin[0], y_lin[1]-y_lin[0]
     
     X, Y = np.meshgrid(x_lin, y_lin, indexing='ij')
-    x_flat = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1)
-    y_flat = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1)
+    x_flat = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    y_flat = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
     
     U_arr = []
     
@@ -124,7 +140,9 @@ def energy_conservation_error(model, N=40, N_t=30):
         for t_val in t_lin:
             t_flat = torch.full_like(x_flat, t_val)
             preds = model(x_flat, y_flat, t_flat)
-            Ez, Bx, By = preds[0].numpy(), preds[1].numpy(), preds[2].numpy()
+            Ez = preds[0].cpu().numpy()
+            Bx = preds[1].cpu().numpy()
+            By = preds[2].cpu().numpy()
             
             u_density = 0.5 * eps0 * (Ez**2) + (0.5 / mu0) * (Bx**2 + By**2)
             U = np.sum(u_density) * dx * dy
