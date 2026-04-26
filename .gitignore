@@ -1,3 +1,7 @@
 __pycache__/
-*.pt
-*.png
+!results/*.png
+!results/*.pth
+!results/*.txt
+!pinn-maxwell/results/*.png
+!pinn-maxwell/results/*.pth
+!pinn-maxwell/results/*.txt
