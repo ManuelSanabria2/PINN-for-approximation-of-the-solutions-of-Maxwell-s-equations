@@ -5,3 +5,6 @@ __pycache__/
 !pinn-maxwell/results/*.png
 !pinn-maxwell/results/*.pth
 !pinn-maxwell/results/*.txt
+
+# Ignore log files
+*.log
