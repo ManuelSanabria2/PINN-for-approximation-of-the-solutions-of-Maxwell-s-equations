@@ -3,244 +3,128 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Faraday Cavity - PINN Maxwell</title>
+  <title>Maxwell PINN — Faraday Digital</title>
+  
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Three.js Import Map -->
   <script type="importmap">
-    {"imports":{
-      "three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-      "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
-    }}
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+      }
+    }
   </script>
-  <style>
-    :root {
-      --bg: #0b0f14;
-      --panel: rgba(18, 24, 32, 0.88);
-      --panel-strong: rgba(11, 15, 20, 0.92);
-      --border: rgba(94, 111, 132, 0.34);
-      --text: #e7edf4;
-      --muted: #8793a2;
-      --accent: #58a6ff;
-      --ok: #3fb950;
-      --warn: #d29922;
-      --bad: #f85149;
-      --font-ui: 'Inter', system-ui, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-ui);
-      font-size: 13px;
-      overflow: hidden;
-      user-select: none;
-    }
-    #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-
-    #status-bar {
-      position: absolute; top: 18px; left: 18px; z-index: 10;
-      display: flex; gap: 10px; flex-wrap: wrap; max-width: calc(100vw - 380px);
-    }
-    .badge, .metric-card, #colorbar, #res-panel, #sidebar {
-      background: var(--panel);
-      backdrop-filter: blur(14px);
-      border: 1px solid var(--border);
-      box-shadow: 0 14px 42px rgba(0,0,0,0.34);
-    }
-    .badge {
-      padding: 7px 12px; border-radius: 999px;
-      font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 7px;
-    }
-    .badge::before {
-      content: ''; width: 8px; height: 8px; border-radius: 50%;
-      background: var(--warn); box-shadow: 0 0 10px var(--warn);
-    }
-    .badge.pinn::before { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
-    .metric-card {
-      padding: 7px 11px; border-radius: 8px;
-      font-family: var(--font-mono); font-size: 11px; color: var(--muted);
-    }
-    .metric-card b { color: var(--text); font-size: 12px; margin-left: 4px; }
-
-    #sidebar {
-      position: absolute; right: 18px; top: 18px; bottom: 18px; z-index: 10;
-      width: 330px; border-radius: 10px; overflow-y: auto; overflow-x: hidden;
-    }
-    .panel-header { padding: 18px 18px 14px; border-bottom: 1px solid var(--border); }
-    .panel-header h1 { font-size: 17px; font-weight: 700; color: #fff; }
-    .panel-header p { margin-top: 4px; color: var(--muted); font-size: 12px; }
-    .panel-section { padding: 16px 18px; border-bottom: 1px solid var(--border); }
-    .panel-section:last-child { border-bottom: 0; }
-    .panel-section h2 {
-      font-size: 10px; text-transform: uppercase; letter-spacing: 1.1px;
-      color: var(--muted); margin-bottom: 13px; font-weight: 700;
-    }
-    .control-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
-    .control-label { color: var(--text); font-size: 12px; }
-    .control-val { font-family: var(--font-mono); font-size: 11px; color: var(--accent); }
-    input[type=range] {
-      -webkit-appearance: none; width: 100%; height: 4px; background: rgba(135,147,162,0.28);
-      border-radius: 999px; outline: none; margin-bottom: 12px;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-      background: var(--accent); cursor: pointer; box-shadow: 0 0 0 4px rgba(88,166,255,0.14);
-    }
-    .btn {
-      width: 100%; padding: 8px 10px; border: 1px solid rgba(88,166,255,0.42);
-      background: rgba(88,166,255,0.11); color: var(--accent); border-radius: 7px;
-      font: 600 12px var(--font-ui); cursor: pointer;
-    }
-    .segmented-control {
-      display: flex; gap: 4px; padding: 4px; border: 1px solid var(--border);
-      background: rgba(0,0,0,0.22); border-radius: 8px; margin-bottom: 13px;
-    }
-    .seg-btn {
-      flex: 1; padding: 6px 5px; border-radius: 5px; text-align: center;
-      color: var(--muted); font-size: 11px; cursor: pointer;
-    }
-    .seg-btn.active { background: rgba(88,166,255,0.17); color: var(--text); font-weight: 600; }
-    select {
-      width: 100%; padding: 8px 9px; margin-bottom: 12px;
-      background: rgba(0,0,0,0.24); color: var(--text);
-      border: 1px solid var(--border); border-radius: 7px; outline: none;
-      font: 12px var(--font-ui);
-    }
-    .toggle {
-      position: relative; flex: 0 0 auto; width: 36px; height: 20px;
-      background: rgba(135,147,162,0.35); border-radius: 999px; cursor: pointer;
-    }
-    .toggle::after {
-      content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
-      border-radius: 50%; background: #d6dee8; transition: transform 0.2s;
-    }
-    .toggle.on { background: rgba(88,166,255,0.72); }
-    .toggle.on::after { transform: translateX(16px); }
-
-    #colorbar {
-      position: absolute; right: 366px; bottom: 18px; z-index: 10;
-      display: flex; flex-direction: column; align-items: center; gap: 6px;
-      padding: 10px 8px; border-radius: 8px;
-    }
-    #cb-gradient {
-      width: 12px; height: 122px; border-radius: 999px;
-      background: linear-gradient(to top, #000004, #3b0f70, #8c2981, #de4968, #fe9f6d, #fcfdbf);
-    }
-    .cb-label { font: 10px var(--font-mono); color: var(--muted); }
-
-    #res-panel {
-      position: absolute; left: 18px; bottom: 18px; z-index: 10;
-      width: 345px; padding: 14px 16px; border-radius: 10px;
-    }
-    #res-panel h3 {
-      font-size: 10px; text-transform: uppercase; letter-spacing: 1.1px;
-      color: var(--muted); margin-bottom: 10px;
-    }
-    .res-row { display: grid; grid-template-columns: 86px 1fr 64px; gap: 8px; align-items: center; margin-bottom: 7px; }
-    .res-name { color: var(--muted); font-size: 11px; }
-    .res-val { font: 10px var(--font-mono); color: var(--text); text-align: right; }
-    .res-bar-bg { height: 5px; border-radius: 999px; overflow: hidden; background: rgba(135,147,162,0.18); }
-    .res-bar { height: 100%; width: 0%; border-radius: inherit; background: var(--ok); transition: width 0.25s, background 0.25s; }
-    #res-chart { width: 100%; height: 54px; margin-top: 5px; border-radius: 6px; background: var(--panel-strong); }
-    #footer {
-      position: absolute; left: 380px; bottom: 20px; z-index: 5;
-      color: var(--muted); font-size: 11px; pointer-events: none;
-    }
-    @media (max-width: 820px) {
-      #sidebar { width: calc(100vw - 36px); left: 18px; top: auto; max-height: 44vh; }
-      #status-bar { max-width: calc(100vw - 36px); }
-      #colorbar { right: 18px; bottom: 48vh; }
-      #res-panel { width: calc(100vw - 36px); bottom: calc(44vh + 30px); }
-      #footer { display: none; }
-    }
-  </style>
 </head>
 <body>
+
+<div id="loader">
+  <div class="loader-wave">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <h2>Resolviendo Maxwell PINN</h2>
+  <p style="color: var(--text-muted); font-size: 11px; margin-top: 5px;">Sincronizando campos electromagnéticos...</p>
+</div>
+
 <canvas id="c"></canvas>
 
 <div id="status-bar">
-  <div id="mode-badge" class="badge">Solucion Analitica</div>
-  <div class="metric-card">FPS <b id="s-fps">60</b></div>
-  <div class="metric-card">Ez <b id="s-ez">0.000</b></div>
-  <div class="metric-card">|B| <b id="s-bm">0.000</b></div>
-  <div class="metric-card">PDE <b id="s-pde">0.0e+0</b></div>
+  <div id="mode-badge" class="badge glass analytical">Analítica</div>
+  <div class="metric glass">FPS <b id="s-fps">60</b></div>
+  <div class="metric glass">Ez <b id="s-ez">0.000</b></div>
+  <div class="metric glass">|B| <b id="s-bm">0.000</b></div>
 </div>
 
-<div id="sidebar">
+<div id="sidebar" class="glass">
   <div class="panel-header">
-    <h1>Camara de Faraday</h1>
-    <p>PINN Maxwell TM11 con diagnostico fisico en vivo</p>
+    <h1>Faraday Digital</h1>
+    <p>Solucionador Maxwell PINN Modo TM₁₁</p>
   </div>
 
-  <div class="panel-section">
-    <h2>Dinamica temporal</h2>
-    <div class="control-row"><span class="control-label">Tiempo t</span><span class="control-val" id="v-t">0.000 s</span></div>
+  <div class="section">
+    <h2>Control Temporal</h2>
+    <div class="row"><span class="lbl">Tiempo t</span><span class="val" id="v-t">0.000 s</span></div>
     <input type="range" id="sl-t" min="0" max="2.828" step="0.004" value="0">
-    <div class="control-row"><span class="control-label">Velocidad</span><span class="control-val" id="v-sp">1.0x</span></div>
+    <div class="row"><span class="lbl">Velocidad</span><span class="val" id="v-sp">1.0x</span></div>
     <input type="range" id="sl-sp" min="0.1" max="4" step="0.1" value="1">
-    <button class="btn" id="btn-play">Pausar simulacion</button>
+    <button class="btn" id="btn-play">Pausar Simulación</button>
   </div>
 
-  <div class="panel-section">
-    <h2>Plano de observacion</h2>
-    <div class="segmented-control">
-      <div class="seg-btn active" data-axis="xy">XY</div>
-      <div class="seg-btn" data-axis="xz">XT</div>
-      <div class="seg-btn" data-axis="yz">YT</div>
+  <div class="section">
+    <h2>Espacio de Trabajo</h2>
+    <div class="seg-ctrl">
+      <div class="seg-btn active" data-axis="xy">PLANO XY</div>
+      <div class="seg-btn" data-axis="xz">PLANO XT</div>
+      <div class="seg-btn" data-axis="yz">PLANO YT</div>
     </div>
     <div id="pos-wrap" style="display:none">
-      <div class="control-row"><span class="control-label">Posicion del corte</span><span class="control-val" id="v-pos">0.50</span></div>
+      <div class="row"><span class="lbl">Corte en Eje</span><span class="val" id="v-pos">0.50</span></div>
       <input type="range" id="sl-pos" min="0.02" max="0.98" step="0.01" value="0.5">
     </div>
-    <div class="control-row"><span class="control-label">Resolucion</span><span class="control-val" id="v-res">64</span></div>
+    <div class="row"><span class="lbl">Malla</span><span class="val" id="v-res">64</span></div>
     <input type="range" id="sl-res" min="24" max="96" step="8" value="64">
   </div>
 
-  <div class="panel-section">
-    <h2>Campo y densidad</h2>
+  <div class="section">
+    <h2>Visualización</h2>
     <select id="field-mode">
-      <option value="ez">Campo electrico Ez</option>
-      <option value="bmag" selected>Magnitud magnetica |B|</option>
-      <option value="energy">Densidad de energia</option>
-      <option value="residual">Residual PDE espacial</option>
+      <option value="ez">Campo Eléctrico Ez</option>
+      <option value="bmag" selected>Magnitud Magnética |B|</option>
+      <option value="energy">Densidad de Energía</option>
+      <option value="residual">Residual PDE (Físico)</option>
     </select>
-    <div class="control-row"><span class="control-label">Lineas de corriente RK4</span><div class="toggle on" id="tog-stream"></div></div>
-    <div class="control-row"><span class="control-label">Vectores B</span><div class="toggle on" id="tog-vec"></div></div>
-    <div class="control-row"><span class="control-label">Puntos de colocacion</span><div class="toggle on" id="tog-ghost"></div></div>
-    <div class="control-row"><span class="control-label">Frontera PEC</span><div class="toggle on" id="tog-box"></div></div>
+    <div class="row"><span class="lbl">Líneas RK4</span><div class="toggle on" id="tog-stream"></div></div>
+    <div class="row"><span class="lbl">Vectores B</span><div class="toggle on" id="tog-vec"></div></div>
+    <div class="row"><span class="lbl">Colocación</span><div class="toggle on" id="tog-ghost"></div></div>
+    <div class="row"><span class="lbl">Frontera PEC</span><div class="toggle on" id="tog-box"></div></div>
   </div>
 
-  <div class="panel-section">
-    <h2>Medio parametrico</h2>
-    <div class="control-row"><span class="control-label">Permitividad eps_r</span><span class="control-val" id="v-eps">1.00</span></div>
+  <div class="section">
+    <h2>Física del Medio</h2>
+    <div class="row"><span class="lbl">ε_r</span><span class="val" id="v-eps">1.00</span></div>
     <input type="range" id="sl-eps" min="1" max="10" step="0.25" value="1">
-    <div class="control-row"><span class="control-label">Permeabilidad mu_r</span><span class="control-val" id="v-mu">1.00</span></div>
+    <div class="row"><span class="lbl">μ_r</span><span class="val" id="v-mu">1.00</span></div>
     <input type="range" id="sl-mu" min="1" max="5" step="0.25" value="1">
-    <div class="control-row"><span class="control-label">Frecuencia fuente</span><span class="control-val" id="v-freq">1.00x</span></div>
+    <div class="row"><span class="lbl">Freq. Fuente</span><span class="val" id="v-freq">1.00x</span></div>
     <input type="range" id="sl-freq" min="0.5" max="2.5" step="0.05" value="1">
-    <div class="control-row"><span class="control-label">Conductividad paredes</span><span class="control-val" id="v-sigma">0.00</span></div>
+    <div class="row"><span class="lbl">Damping</span><span class="val" id="v-sigma">0.00</span></div>
     <input type="range" id="sl-sigma" min="0" max="0.7" step="0.02" value="0">
   </div>
 </div>
 
-<div id="colorbar">
-  <span class="cb-label" id="cb-max">+1.00</span>
-  <div id="cb-gradient"></div>
-  <span class="cb-label" id="cb-min">0.00</span>
-  <span class="cb-label" id="cb-title">|B|</span>
+<div id="colorbar" class="glass">
+  <span class="cb-lbl" id="cb-max">+1.00</span>
+  <div id="cb-grad"></div>
+  <span class="cb-lbl" id="cb-min">0.00</span>
+  <span class="cb-lbl" style="font-weight:700; margin-top:4px;" id="cb-title">|B|</span>
 </div>
 
-<div id="res-panel">
-  <h3>Residuales Maxwell</h3>
-  <div class="res-row"><span class="res-name">Faraday x</span><div class="res-bar-bg"><div class="res-bar" id="bar-fx"></div></div><span class="res-val" id="res-fx">--</span></div>
-  <div class="res-row"><span class="res-name">Faraday y</span><div class="res-bar-bg"><div class="res-bar" id="bar-fy"></div></div><span class="res-val" id="res-fy">--</span></div>
-  <div class="res-row"><span class="res-name">Ampere</span><div class="res-bar-bg"><div class="res-bar" id="bar-am"></div></div><span class="res-val" id="res-am">--</span></div>
-  <div class="res-row"><span class="res-name">Gauss B</span><div class="res-bar-bg"><div class="res-bar" id="bar-ga"></div></div><span class="res-val" id="res-ga">--</span></div>
-  <canvas id="res-chart" width="313" height="54"></canvas>
+<div id="res-panel" class="glass">
+  <h3>Diagnóstico de Residuales Maxwell</h3>
+  <div class="res-row">
+    <div class="res-info"><span>Faraday Eje X</span><b id="res-fx">--</b></div>
+    <div class="res-bar-bg"><div class="res-bar" id="bar-fx"></div></div>
+  </div>
+  <div class="res-row">
+    <div class="res-info"><span>Faraday Eje Y</span><b id="res-fy">--</b></div>
+    <div class="res-bar-bg"><div class="res-bar" id="bar-fy"></div></div>
+  </div>
+  <div class="res-row">
+    <div class="res-info"><span>Ley de Ampère</span><b id="res-am">--</b></div>
+    <div class="res-bar-bg"><div class="res-bar" id="bar-am"></div></div>
+  </div>
+  <div class="res-row">
+    <div class="res-info"><span>Ley de Gauss B</span><b id="res-ga">--</b></div>
+    <div class="res-bar-bg"><div class="res-bar" id="bar-ga"></div></div>
+  </div>
+  <canvas id="res-chart"></canvas>
 </div>
-
-<div id="footer">TM11 | L = 1.0 | omega_eff = <span id="bd-om">4.443</span> rad/s</div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -249,9 +133,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const T_MAX = 2.828427;
 const OMEGA = Math.PI * Math.SQRT2;
 const API = location.protocol.startsWith('http') ? location.origin : 'http://127.0.0.1:8000';
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const tEff = (t, e, m, f) => t * f / Math.sqrt(Math.max(e * m, 1e-9));
-const damp = (t, sigma) => Math.exp(-Math.max(0, sigma) * Math.max(0, t));
+const damp = (t, s) => Math.exp(-Math.max(0, s) * Math.max(0, t));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 const S = {
   t: 0, axis: 'xy', position: 0.5, eps_r: 1, mu_r: 1, freq_scale: 1, sigma_wall: 0,
@@ -262,6 +146,17 @@ const S = {
   lastFetch: 0, lastGrid: 0, lastResidual: 0, residualHistory: []
 };
 
+// ── UI Colors ──
+const infernoMap = [[0,0,4],[40,11,84],[101,21,110],[159,42,99],[212,72,66],[245,125,21],[252,187,54],[252,255,164]];
+const divergeMap = [[33,102,172],[103,169,207],[209,229,240],[247,247,247],[253,219,199],[239,138,98],[178,24,43]];
+
+function getColor(v, min, max, map) {
+  const t = clamp((v - min) / (max - min || 1), 0, 1);
+  const p = t * (map.length - 1), i = Math.min(map.length - 2, Math.floor(p)), u = p - i;
+  return map[i].map((a, k) => Math.round(a + (map[i+1][k] - a) * u));
+}
+
+// ── Physics ──
 function fieldAt(x, y, t) {
   const te = tEff(t, S.eps_r, S.mu_r, S.freq_scale);
   const a = damp(t, S.sigma_wall);
@@ -271,469 +166,193 @@ function fieldAt(x, y, t) {
   return { Ez, Bx, By };
 }
 
-function analyticalSlice(N, axis, pos, t) {
-  const lin = Array.from({length: N}, (_, i) => i / (N - 1));
-  const Ez = [], Bx = [], By = [];
-  for (let j = 0; j < N; j++) {
-    const rEz = [], rBx = [], rBy = [];
-    for (let i = 0; i < N; i++) {
-      let x, y, tt = t;
-      if (axis === 'xy') { x = lin[i]; y = lin[j]; }
-      else if (axis === 'xz') { x = lin[i]; y = pos; tt = lin[j] * T_MAX; }
-      else { x = pos; y = lin[j]; tt = lin[i] * T_MAX; }
-      const f = fieldAt(x, y, tt);
-      rEz.push(f.Ez); rBx.push(f.Bx); rBy.push(f.By);
-    }
-    Ez.push(rEz); Bx.push(rBx); By.push(rBy);
-  }
-  return { Ez, Bx, By, t_eff: tEff(t, S.eps_r, S.mu_r, S.freq_scale) };
-}
+// ── Three.js Init ──
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
-function analyticalGrid(N, t) {
-  const Bx = [], By = [], Ez = [], Bmag = [];
-  for (let j = 0; j < N; j++) {
-    const rBx = [], rBy = [], rEz = [], rBm = [];
-    for (let i = 0; i < N; i++) {
-      const f = fieldAt(i/(N-1), j/(N-1), t);
-      rBx.push(f.Bx); rBy.push(f.By); rEz.push(f.Ez); rBm.push(Math.hypot(f.Bx, f.By));
-    }
-    Bx.push(rBx); By.push(rBy); Ez.push(rEz); Bmag.push(rBm);
-  }
-  return { N, Bx, By, Ez, Bmag };
-}
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(2.2, 1.8, 2.2);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.target.set(0.5, 0.5, 0.5);
 
-function analyticalResiduals() {
-  const perturb = Math.abs(S.freq_scale - 1) * 8e-3 + S.sigma_wall * 4e-3;
-  return {
-    faraday_x: perturb, faraday_y: perturb * 0.9,
-    ampere: perturb * 1.2, gauss_b: perturb * 0.35,
-    total_mse: perturb * perturb
-  };
-}
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+const dLight = new THREE.DirectionalLight(0xffffff, 1);
+dLight.position.set(2, 5, 3);
+scene.add(dLight);
 
-function analyticalResidualMap(N) {
-  const base = analyticalResiduals().faraday_x;
-  const total = [];
-  for (let j = 0; j < N; j++) {
-    const row = [];
-    for (let i = 0; i < N; i++) {
-      row.push(base * (0.35 + 0.65 * Math.sin(Math.PI*i/(N-1)) * Math.sin(Math.PI*j/(N-1))));
-    }
-    total.push(row);
-  }
-  return { N, total };
-}
+// Box
+const boxLine = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.01, 1.01, 1.01)),
+  new THREE.LineBasicMaterial({ color: 0x4b5563, transparent: true, opacity: 0.5 })
+);
+boxLine.position.set(0.5, 0.5, 0.5);
+scene.add(boxLine);
 
+// Main Slice Mesh
+let sliceArr = new Uint8Array(S.resolution * S.resolution * 3);
+let sliceTex = new THREE.DataTexture(sliceArr, S.resolution, S.resolution, THREE.RGBFormat);
+const sliceMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ map: sliceTex, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+);
+scene.add(sliceMesh);
+
+// Arrows & Streamlines
+const arrowCount = 100;
+const arrowMesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.015, 0.08, 8), new THREE.MeshPhongMaterial(), arrowCount);
+scene.add(arrowMesh);
+const streamGroup = new THREE.Group();
+scene.add(streamGroup);
+
+// ── API Functions ──
 async function checkAPI() {
   try {
-    const r = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(1200) });
-    const info = r.ok ? await r.json() : {};
-    S.usePINN = r.ok && info.model_loaded === true;
+    const r = await fetch(`${API}/api/health`);
+    S.usePINN = r.ok && (await r.json()).model_loaded;
+    document.getElementById('loader').style.opacity = '0';
+    setTimeout(() => document.getElementById('loader').style.visibility = 'hidden', 800);
+  } catch {
+    S.usePINN = false;
+    document.getElementById('loader').style.opacity = '0';
+    setTimeout(() => document.getElementById('loader').style.visibility = 'hidden', 800);
   }
-  catch { S.usePINN = false; }
   updateBadge();
-}
-
-function payload(extra = {}) {
-  return JSON.stringify({
-    t: S.t, N: S.resolution, axis: S.axis, position: S.position,
-    eps_r: S.eps_r, mu_r: S.mu_r, freq_scale: S.freq_scale, sigma_wall: S.sigma_wall,
-    ...extra
-  });
-}
-
-async function fetchSlice() {
-  if (S.fetchPending) return;
-  S.fetchPending = true;
-  try {
-    if (!S.usePINN) throw new Error('offline');
-    const r = await fetch(`${API}/slice`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: payload(), signal: AbortSignal.timeout(2200) });
-    if (!r.ok) throw new Error('slice');
-    S.sliceData = await r.json();
-  } catch {
-    S.usePINN = false; updateBadge();
-    S.sliceData = analyticalSlice(S.resolution, S.axis, S.position, S.t);
-  } finally { S.fetchPending = false; }
-}
-
-async function fetchGrid() {
-  if (S.gridPending || S.axis !== 'xy') return;
-  S.gridPending = true;
-  try {
-    if (!S.usePINN) throw new Error('offline');
-    const r = await fetch(`${API}/field_grid`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: payload({ N: 42 }), signal: AbortSignal.timeout(2200) });
-    if (!r.ok) throw new Error('grid');
-    S.gridData = await r.json();
-  } catch {
-    S.gridData = analyticalGrid(42, S.t);
-  } finally { S.gridPending = false; }
-}
-
-async function fetchResiduals() {
-  if (S.resPending) return;
-  S.resPending = true;
-  try {
-    if (!S.usePINN) throw new Error('offline');
-    const r = await fetch(`${API}/residuals`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: payload({ N: 18 }), signal: AbortSignal.timeout(2600) });
-    if (!r.ok) throw new Error('res');
-    updateResidualPanel(await r.json());
-  } catch {
-    updateResidualPanel(analyticalResiduals());
-  }
-  try {
-    if (S.fieldMode === 'residual' && S.usePINN) {
-      const r = await fetch(`${API}/residual_map`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: payload({ N: 24 }), signal: AbortSignal.timeout(2600) });
-      S.residualMap = r.ok ? await r.json() : analyticalResidualMap(24);
-    } else if (S.fieldMode === 'residual') {
-      S.residualMap = analyticalResidualMap(24);
-    }
-  } catch { S.residualMap = analyticalResidualMap(24); }
-  S.resPending = false;
 }
 
 function updateBadge() {
   const el = document.getElementById('mode-badge');
-  el.textContent = S.usePINN ? 'PINN activo' : 'Solucion analitica';
-  el.className = `badge ${S.usePINN ? 'pinn' : ''}`;
+  el.textContent = S.usePINN ? 'PINN Activo' : 'Analítica';
+  el.className = `badge glass ${S.usePINN ? 'pinn' : 'analytical'}`;
 }
 
-function inferno(v, min, max) {
-  const t = clamp((v - min) / (max - min || 1), 0, 1);
-  const stops = [[0,0,4],[40,11,84],[101,21,110],[159,42,99],[212,72,66],[245,125,21],[252,187,54],[252,255,164]];
-  const p = t * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(p)), u = p - i;
-  return stops[i].map((a, k) => Math.round(a + (stops[i+1][k] - a) * u));
-}
-
-function diverging(v, min, max) {
-  const t = clamp((v - min) / (max - min || 1), 0, 1);
-  const a = t < 0.5 ? [33,102,172] : [247,247,247];
-  const b = t < 0.5 ? [247,247,247] : [178,24,43];
-  const u = t < 0.5 ? t * 2 : (t - 0.5) * 2;
-  return a.map((x, k) => Math.round(x + (b[k] - x) * u));
-}
-
-const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b0f14);
-const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
-camera.position.set(2.15, 1.8, 2.2);
-const controls = new OrbitControls(camera, canvas);
-controls.target.set(0.5, 0.5, 0.5);
-controls.enableDamping = true;
-
-scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 0.7));
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(2, 3, 1.5);
-scene.add(dirLight);
-
-const boxMat = new THREE.LineBasicMaterial({ color: 0x60758f, transparent: true, opacity: 0.82 });
-const boxLine = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), boxMat);
-boxLine.position.set(0.5, 0.5, 0.5);
-scene.add(boxLine);
-
-function label(txt, pos) {
-  const c = document.createElement('canvas'); c.width = 72; c.height = 36;
-  const ctx = c.getContext('2d');
-  ctx.font = '700 24px Inter'; ctx.fillStyle = '#e7edf4'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(txt, 36, 18);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
-  s.position.copy(pos); s.scale.set(0.18, 0.09, 1);
-  scene.add(s);
-}
-label('X', new THREE.Vector3(1.1, 0, 0));
-label('Y', new THREE.Vector3(0, 1.1, 0));
-label('t', new THREE.Vector3(0, 0, 1.1));
-
-let SLICE_N = S.resolution;
-let sliceArr = new Uint8Array(SLICE_N * SLICE_N * 3);
-let sliceTex = new THREE.DataTexture(sliceArr, SLICE_N, SLICE_N, THREE.RGBFormat);
-sliceTex.needsUpdate = true;
-const planeMat = new THREE.MeshBasicMaterial({ map: sliceTex, side: THREE.DoubleSide, transparent: true, opacity: 0.92 });
-const sliceMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), planeMat);
-sliceMesh.position.set(0.5, 0.5, 0);
-scene.add(sliceMesh);
-sliceMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(1, 1)), new THREE.LineBasicMaterial({ color: 0x58a6ff, transparent: true, opacity: 0.48 })));
-
-const arrowCount = 100;
-const arrowMesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.014, 0.07, 8), new THREE.MeshPhongMaterial({ shininess: 30 }), arrowCount);
-arrowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-scene.add(arrowMesh);
-const dummy = new THREE.Object3D();
-const arrowX = new Float32Array(arrowCount), arrowY = new Float32Array(arrowCount), arrowBx = new Float32Array(arrowCount), arrowBy = new Float32Array(arrowCount);
-
-const ghostPos = new Float32Array(3600);
-for (let i = 0; i < ghostPos.length; i++) ghostPos[i] = Math.random();
-const ghostGeom = new THREE.BufferGeometry();
-ghostGeom.setAttribute('position', new THREE.BufferAttribute(ghostPos, 3));
-const ghostMesh = new THREE.Points(ghostGeom, new THREE.PointsMaterial({ color: 0x8b98aa, size: 0.01, transparent: true, opacity: 0.24 }));
-scene.add(ghostMesh);
-
-const streamlineGroup = new THREE.Group();
-scene.add(streamlineGroup);
-const streamlineMat = new THREE.LineBasicMaterial({ color: 0xd9f99d, transparent: true, opacity: 0.78 });
-
-function gridSample(grid, x, y) {
-  if (!grid) return fieldAt(x, y, S.t);
-  const N = grid.N || grid.Bx.length;
-  const gx = clamp(x, 0, 1) * (N - 1), gy = clamp(y, 0, 1) * (N - 1);
-  const i0 = Math.floor(gx), j0 = Math.floor(gy), i1 = Math.min(N - 1, i0 + 1), j1 = Math.min(N - 1, j0 + 1);
-  const tx = gx - i0, ty = gy - j0;
-  const bilerp = arr => {
-    const a = arr[j0][i0] * (1 - tx) + arr[j0][i1] * tx;
-    const b = arr[j1][i0] * (1 - tx) + arr[j1][i1] * tx;
-    return a * (1 - ty) + b * ty;
+async function updateData() {
+  if (S.fetchPending) return;
+  S.fetchPending = true;
+  
+  const payload = {
+    t: S.t, N: S.resolution, axis: S.axis, position: S.position,
+    eps_r: S.eps_r, mu_r: S.mu_r, freq_scale: S.freq_scale, sigma_wall: S.sigma_wall
   };
-  return { Bx: bilerp(grid.Bx), By: bilerp(grid.By), Ez: grid.Ez ? bilerp(grid.Ez) : 0 };
+
+  try {
+    if (S.usePINN) {
+      const r = await fetch(`${API}/slice`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+      if (r.ok) S.sliceData = await r.json();
+    } else {
+      S.sliceData = analyticalSlice(S.resolution, S.axis, S.position, S.t);
+    }
+  } catch { S.usePINN = false; updateBadge(); }
+  
+  applySlice();
+  S.fetchPending = false;
 }
 
-function rk4Step(p, h) {
-  const v = q => {
-    const f = gridSample(S.gridData, q.x, q.y);
-    const m = Math.hypot(f.Bx, f.By);
-    if (m < 1e-7) return { x: 0, y: 0 };
-    return { x: f.Bx / m, y: f.By / m };
-  };
-  const k1 = v(p);
-  const k2 = v({ x: p.x + 0.5*h*k1.x, y: p.y + 0.5*h*k1.y });
-  const k3 = v({ x: p.x + 0.5*h*k2.x, y: p.y + 0.5*h*k2.y });
-  const k4 = v({ x: p.x + h*k3.x, y: p.y + h*k3.y });
-  return {
-    x: p.x + h * (k1.x + 2*k2.x + 2*k3.x + k4.x) / 6,
-    y: p.y + h * (k1.y + 2*k2.y + 2*k3.y + k4.y) / 6
-  };
-}
-
-function traceFrom(seed, dir, z) {
-  const pts = [];
-  let p = { ...seed };
-  for (let s = 0; s < 70; s++) {
-    if (p.x < 0.01 || p.x > 0.99 || p.y < 0.01 || p.y > 0.99) break;
-    const f = gridSample(S.gridData, p.x, p.y);
-    if (Math.hypot(f.Bx, f.By) < 0.012) break;
-    pts.push(new THREE.Vector3(p.x, p.y, z + 0.006));
-    p = rk4Step(p, 0.018 * dir);
+function analyticalSlice(N, axis, pos, t) {
+  const Ez = [], Bx = [], By = [];
+  for (let j = 0; j < N; j++) {
+    const rE = [], rX = [], rY = [];
+    for (let i = 0; i < N; i++) {
+      let x, y, tt = t;
+      if (axis === 'xy') { x = i/(N-1); y = j/(N-1); }
+      else if (axis === 'xz') { x = i/(N-1); y = pos; tt = (j/(N-1))*T_MAX; }
+      else { x = pos; y = j/(N-1); tt = (i/(N-1))*T_MAX; }
+      const f = fieldAt(x, y, tt);
+      rE.push(f.Ez); rX.push(f.Bx); rY.push(f.By);
+    }
+    Ez.push(rE); Bx.push(rX); By.push(rY);
   }
-  return pts;
+  return { Ez, Bx, By };
 }
 
-function rebuildStreamlines() {
-  streamlineGroup.clear();
-  if (!S.showStream || S.axis !== 'xy' || !S.gridData) return;
-  const z = S.t / T_MAX;
-  const seeds = [];
-  for (let y = 0.14; y <= 0.86; y += 0.12) {
-    for (let x = 0.14; x <= 0.86; x += 0.12) seeds.push({ x, y });
+function applySlice() {
+  if (!S.sliceData) return;
+  const N = S.resolution;
+  if (sliceArr.length !== N * N * 3) {
+    sliceArr = new Uint8Array(N * N * 3);
+    sliceTex = new THREE.DataTexture(sliceArr, N, N, THREE.RGBFormat);
+    sliceMesh.material.map = sliceTex;
   }
-  for (const seed of seeds) {
-    const pts = traceFrom(seed, -1, z).reverse().concat(traceFrom(seed, 1, z));
-    if (pts.length < 8) continue;
-    const geom = new THREE.BufferGeometry().setFromPoints(pts);
-    streamlineGroup.add(new THREE.Line(geom, streamlineMat));
-  }
-}
-
-function selectedMatrix(data) {
-  if (!data) return null;
-  if (S.fieldMode === 'residual') return S.residualMap?.total || null;
-  const N = data.Ez.length;
-  const m = [];
+  
+  let matrix = [];
+  let min = 0, max = 1;
+  const m = S.fieldMode;
+  
   for (let j = 0; j < N; j++) {
     const row = [];
     for (let i = 0; i < N; i++) {
-      const ez = data.Ez[j][i], bx = data.Bx[j][i] || 0, by = data.By[j][i] || 0;
-      if (S.fieldMode === 'ez') row.push(ez);
-      else if (S.fieldMode === 'energy') row.push(0.5 * ez * ez + 0.5 * (bx * bx + by * by));
-      else row.push(Math.hypot(bx, by));
+      const e = S.sliceData.Ez[j][i], x = S.sliceData.Bx[j][i], y = S.sliceData.By[j][i];
+      let val = 0;
+      if (m === 'ez') val = e;
+      else if (m === 'bmag') val = Math.hypot(x, y);
+      else val = 0.5*(e*e + x*x + y*y);
+      row.push(val);
+      if (val < min) min = val;
+      if (val > max) max = val;
     }
-    m.push(row);
+    matrix.push(row);
   }
-  return m;
-}
 
-function applySliceData(data) {
-  if (!data) return;
-  let matrix = selectedMatrix(data);
-  if (!matrix) matrix = selectedMatrix(analyticalSlice(S.resolution, S.axis, S.position, S.t));
-  if (!matrix) matrix = analyticalResidualMap(24).total;
-  const N = matrix.length;
-  if (N !== SLICE_N) {
-    SLICE_N = N; sliceArr = new Uint8Array(N * N * 3);
-    sliceTex = new THREE.DataTexture(sliceArr, N, N, THREE.RGBFormat);
-    planeMat.map = sliceTex; planeMat.needsUpdate = true;
-  }
-  let min = Infinity, max = -Infinity;
-  for (const row of matrix) for (const v of row) { min = Math.min(min, v); max = Math.max(max, v); }
-  if (S.fieldMode === 'ez') { const s = Math.max(Math.abs(min), Math.abs(max), 1e-3); min = -s; max = s; }
-  else { min = 0; max = Math.max(max, 1e-6); }
+  if (m === 'ez') { const s = Math.max(Math.abs(min), Math.abs(max)); min = -s; max = s; }
+  else { min = 0; }
 
-  for (let j = 0; j < SLICE_N; j++) for (let i = 0; i < SLICE_N; i++) {
-    const idx = (j * SLICE_N + i) * 3;
-    const rgb = S.fieldMode === 'ez' ? diverging(matrix[j][i], min, max) : inferno(matrix[j][i], min, max);
-    sliceArr[idx] = rgb[0]; sliceArr[idx+1] = rgb[1]; sliceArr[idx+2] = rgb[2];
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const idx = (j * N + i) * 3;
+      const rgb = getColor(matrix[j][i], min, max, m === 'ez' ? divergeMap : infernoMap);
+      sliceArr[idx] = rgb[0]; sliceArr[idx+1] = rgb[1]; sliceArr[idx+2] = rgb[2];
+    }
   }
   sliceTex.needsUpdate = true;
-  document.getElementById('cb-max').textContent = S.fieldMode === 'ez' ? `+${max.toFixed(2)}` : max.toExponential(1);
-  document.getElementById('cb-min').textContent = S.fieldMode === 'ez' ? min.toFixed(2) : '0.0';
-  document.getElementById('cb-title').textContent = { ez: 'Ez', bmag: '|B|', energy: 'Energia', residual: 'PDE' }[S.fieldMode];
-  const mid = Math.floor(data.Ez.length / 2);
-  document.getElementById('s-ez').textContent = data.Ez[mid][mid].toFixed(3);
-  document.getElementById('s-bm').textContent = Math.hypot(data.Bx[mid][mid] || 0, data.By[mid][mid] || 0).toFixed(3);
+  
+  // UI Update
+  document.getElementById('cb-max').textContent = max.toFixed(2);
+  document.getElementById('cb-min').textContent = min.toFixed(2);
+  document.getElementById('cb-grad').style.background = m === 'ez' 
+    ? 'linear-gradient(to top, #2166ac, #f7f7f7, #b2182b)' 
+    : 'linear-gradient(to top, #000004, #de4968, #fcfdbf)';
 }
 
-function applyVectorData() {
-  const grid = S.gridData;
-  if (!grid || S.axis !== 'xy') return;
-  let k = 0, maxMag = 1e-6;
-  for (let y = 0.05; y <= 0.95 && k < arrowCount; y += 0.10) for (let x = 0.05; x <= 0.95 && k < arrowCount; x += 0.10) {
-    const f = gridSample(grid, x, y);
-    arrowX[k] = x; arrowY[k] = y; arrowBx[k] = f.Bx; arrowBy[k] = f.By;
-    maxMag = Math.max(maxMag, Math.hypot(f.Bx, f.By));
-    k++;
-  }
-  const z = S.t / T_MAX + 0.01;
-  for (let i = 0; i < arrowCount; i++) {
-    const mag = Math.hypot(arrowBx[i], arrowBy[i]);
-    dummy.position.set(arrowX[i], arrowY[i], z);
-    dummy.rotation.set(0, 0, Math.atan2(arrowBy[i], arrowBx[i]) - Math.PI / 2);
-    dummy.scale.set(0.72, 0.35 + (mag / maxMag) * 1.8, 0.72);
-    dummy.updateMatrix();
-    arrowMesh.setMatrixAt(i, dummy.matrix);
-    arrowMesh.setColorAt(i, new THREE.Color().setHSL(0.64 - 0.58 * (mag / maxMag), 0.78, 0.62));
-  }
-  if (arrowMesh.instanceColor) arrowMesh.instanceColor.needsUpdate = true;
-  arrowMesh.instanceMatrix.needsUpdate = true;
-}
-
-function updateResidualPanel(res) {
-  const rows = [
-    ['fx', res.faraday_x], ['fy', res.faraday_y], ['am', res.ampere], ['ga', res.gauss_b]
-  ];
-  const total = Math.max(...rows.map(([,v]) => v), 1e-10);
-  for (const [id, v] of rows) {
-    const bar = document.getElementById(`bar-${id}`);
-    const val = document.getElementById(`res-${id}`);
-    bar.style.width = `${clamp((v / Math.max(total, 1e-9)) * 100, 2, 100)}%`;
-    bar.style.background = v < 1e-3 ? 'var(--ok)' : v < 1e-2 ? 'var(--warn)' : 'var(--bad)';
-    val.textContent = v.toExponential(1);
-  }
-  const score = Math.max(res.faraday_x, res.faraday_y, res.ampere, res.gauss_b);
-  document.getElementById('s-pde').textContent = score.toExponential(1);
-  S.residualHistory.push(score);
-  if (S.residualHistory.length > 80) S.residualHistory.shift();
-  drawResidualChart();
-}
-
-function drawResidualChart() {
-  const c = document.getElementById('res-chart');
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, c.width, c.height);
-  ctx.strokeStyle = 'rgba(135,147,162,0.18)';
-  ctx.lineWidth = 1;
-  for (let y = 12; y < c.height; y += 14) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(c.width, y); ctx.stroke(); }
-  const vals = S.residualHistory;
-  if (vals.length < 2) return;
-  const max = Math.max(...vals, 1e-6);
-  ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2; ctx.beginPath();
-  vals.forEach((v, i) => {
-    const x = (i / 79) * c.width;
-    const y = c.height - clamp(v / max, 0, 1) * (c.height - 7) - 3;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-}
-
-function updateSliceTransform() {
-  sliceMesh.position.set(S.axis === 'yz' ? S.position : 0.5, S.axis === 'xz' ? S.position : 0.5, S.axis === 'xy' ? S.t / T_MAX : 0.5);
-  sliceMesh.rotation.set(S.axis === 'xz' ? -Math.PI/2 : 0, S.axis === 'yz' ? -Math.PI/2 : 0, 0);
-}
-
-let prevT = performance.now(), frames = 0, fpsT = performance.now();
+// ── Main Loop ──
+let lastT = performance.now();
 function animate() {
   requestAnimationFrame(animate);
   const now = performance.now();
-  const dt = Math.min((now - prevT) / 1000, 0.05);
-  prevT = now;
-  frames++;
-  if (now - fpsT > 500) {
-    document.getElementById('s-fps').textContent = Math.round(frames * 1000 / (now - fpsT));
-    frames = 0; fpsT = now;
-  }
+  const dt = (now - lastT) / 1000;
+  lastT = now;
+
   if (S.playing) {
     S.t = (S.t + dt * S.speed) % T_MAX;
-    document.getElementById('v-t').textContent = `${S.t.toFixed(3)} s`;
-    if (!document.getElementById('sl-t').matches(':active')) document.getElementById('sl-t').value = S.t;
+    document.getElementById('v-t').textContent = S.t.toFixed(3) + ' s';
+    document.getElementById('sl-t').value = S.t;
   }
-  if (!S.fetchPending && now - S.lastFetch > 70) {
-    S.lastFetch = now;
-    fetchSlice().then(() => applySliceData(S.sliceData));
-  }
-  if (!S.gridPending && now - S.lastGrid > 180) {
-    S.lastGrid = now;
-    fetchGrid().then(() => { applyVectorData(); rebuildStreamlines(); });
-  }
-  if (!S.resPending && now - S.lastResidual > 900) {
-    S.lastResidual = now;
-    fetchResiduals().then(() => { if (S.fieldMode === 'residual') applySliceData(S.sliceData); });
-  }
-  arrowMesh.visible = S.showVec && S.axis === 'xy';
-  streamlineGroup.visible = S.showStream && S.axis === 'xy';
-  boxLine.visible = S.showBox;
-  ghostMesh.visible = S.showGhost;
-  updateSliceTransform();
+
+  updateData();
+
+  sliceMesh.position.set(S.axis === 'yz' ? S.position : 0.5, S.axis === 'xz' ? S.position : 0.5, S.axis === 'xy' ? S.t / T_MAX : 0.5);
+  sliceMesh.rotation.set(S.axis === 'xz' ? -Math.PI/2 : 0, S.axis === 'yz' ? -Math.PI/2 : 0, 0);
+
   controls.update();
   renderer.render(scene, camera);
 }
 
-function invalidate() {
-  S.sliceData = null; S.gridData = null; S.residualMap = null;
-  S.lastFetch = 0; S.lastGrid = 0; S.lastResidual = 0;
-}
-
-document.getElementById('sl-t').addEventListener('input', e => { S.t = parseFloat(e.target.value); document.getElementById('v-t').textContent = `${S.t.toFixed(3)} s`; invalidate(); });
-document.getElementById('sl-sp').addEventListener('input', e => { S.speed = parseFloat(e.target.value); document.getElementById('v-sp').textContent = `${S.speed.toFixed(1)}x`; });
-document.getElementById('btn-play').addEventListener('click', e => { S.playing = !S.playing; e.target.textContent = S.playing ? 'Pausar simulacion' : 'Reanudar simulacion'; });
-document.querySelectorAll('.seg-btn').forEach(btn => btn.addEventListener('click', () => {
-  document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  S.axis = btn.dataset.axis;
+// ── Events ──
+document.getElementById('sl-t').oninput = e => S.t = parseFloat(e.target.value);
+document.getElementById('sl-sp').oninput = e => S.speed = parseFloat(e.target.value);
+document.getElementById('btn-play').onclick = e => { S.playing = !S.playing; e.target.textContent = S.playing ? 'Pausar Simulación' : 'Reanudar'; };
+document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.seg-btn').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  S.axis = b.dataset.axis;
   document.getElementById('pos-wrap').style.display = S.axis === 'xy' ? 'none' : 'block';
-  invalidate();
-}));
-document.getElementById('sl-pos').addEventListener('input', e => { S.position = parseFloat(e.target.value); document.getElementById('v-pos').textContent = S.position.toFixed(2); invalidate(); });
-document.getElementById('sl-res').addEventListener('input', e => { S.resolution = parseInt(e.target.value, 10); document.getElementById('v-res').textContent = S.resolution; invalidate(); });
-document.getElementById('field-mode').addEventListener('change', e => { S.fieldMode = e.target.value; invalidate(); });
-document.getElementById('sl-eps').addEventListener('input', e => { S.eps_r = parseFloat(e.target.value); document.getElementById('v-eps').textContent = S.eps_r.toFixed(2); updateOmega(); invalidate(); });
-document.getElementById('sl-mu').addEventListener('input', e => { S.mu_r = parseFloat(e.target.value); document.getElementById('v-mu').textContent = S.mu_r.toFixed(2); updateOmega(); invalidate(); });
-document.getElementById('sl-freq').addEventListener('input', e => { S.freq_scale = parseFloat(e.target.value); document.getElementById('v-freq').textContent = `${S.freq_scale.toFixed(2)}x`; updateOmega(); invalidate(); });
-document.getElementById('sl-sigma').addEventListener('input', e => { S.sigma_wall = parseFloat(e.target.value); document.getElementById('v-sigma').textContent = S.sigma_wall.toFixed(2); invalidate(); });
-['tog-stream', 'tog-vec', 'tog-ghost', 'tog-box'].forEach(id => document.getElementById(id).addEventListener('click', e => {
-  const el = e.target.closest('.toggle');
-  el.classList.toggle('on');
-  const on = el.classList.contains('on');
-  if (id === 'tog-stream') S.showStream = on;
-  if (id === 'tog-vec') S.showVec = on;
-  if (id === 'tog-ghost') S.showGhost = on;
-  if (id === 'tog-box') S.showBox = on;
-}));
-window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); document.getElementById('btn-play').click(); } });
-window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+});
 
-function updateOmega() {
-  const omega = OMEGA * S.freq_scale / Math.sqrt(S.eps_r * S.mu_r);
-  document.getElementById('bd-om').textContent = omega.toFixed(3);
-}
-
-S.sliceData = analyticalSlice(S.resolution, S.axis, S.position, S.t);
-S.gridData = analyticalGrid(42, S.t);
-applySliceData(S.sliceData);
-applyVectorData();
-rebuildStreamlines();
-updateResidualPanel(analyticalResiduals());
+// Start
 checkAPI();
 animate();
 </script>

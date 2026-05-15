@@ -1,3 +1,13 @@
+---
+title: Maxwell PINN Faraday Digital
+emoji: ⚡
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 #  PINN para Ecuaciones de Maxwell — Cámara de Faraday Digital
 
 > **Red Neuronal Informada por la Física (PINN)** que aproxima la solución analítica exacta de las Ecuaciones de Maxwell en una cavidad rectangular PEC 2D, con demo interactiva 3D en tiempo real.
