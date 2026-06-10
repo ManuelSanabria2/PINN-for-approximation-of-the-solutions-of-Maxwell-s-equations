@@ -332,6 +332,97 @@ def plot_field_lines(model, t_val, N=30, save_path='results/'):
     plt.close()
 
 
+def plot_poynting_vector(model, t_val, N=40, save_path='results/'):
+    """
+    Calcula y grafica el Vector de Poynting S = E x H.
+    Punto 2: Demostración de las Leyes de Conservación.
+    En TM11: E = (0, 0, Ez), B = (Bx, By, 0).
+    H = B / mu0.
+    S = E x H = (Ez * Hy, -Ez * Hx, 0)
+    """
+    safe_makedirs(save_path)
+    device = get_model_device(model)
+    
+    x_lin = np.linspace(0, L, N)
+    y_lin = np.linspace(0, L, N)
+    X, Y = np.meshgrid(x_lin, y_lin, indexing='ij')
+    
+    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    t_t = torch.tensor(np.full_like(X.flatten(), t_val), dtype=torch.float32).unsqueeze(1).to(device)
+    
+    with torch.no_grad():
+        preds = model(x_t, y_t, t_t)
+        Ez = preds[0].cpu().numpy().reshape(N, N)
+        Bx = preds[1].cpu().numpy().reshape(N, N)
+        By = preds[2].cpu().numpy().reshape(N, N)
+        
+    # Convertir B a H
+    Hx = Bx / mu0
+    Hy = By / mu0
+    
+    # S = E x H
+    Sx = Ez * Hy
+    Sy = -Ez * Hx
+    S_mag = np.sqrt(Sx**2 + Sy**2)
+
+    fig, ax = plt.subplots(figsize=(8, 7), dpi=150)
+    c = ax.contourf(X, Y, S_mag, levels=30, cmap='viridis')
+    q = ax.quiver(X[::2, ::2], Y[::2, ::2], Sx[::2, ::2], Sy[::2, ::2], color='white', alpha=0.8)
+    
+    ax.set_title(f"Flujo de Energía (Vector de Poynting $\mathbf{{S}}$) | t = {t_val:.2e}s")
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    fig.colorbar(c, ax=ax, label='|S| ($W/m^2$)')
+    
+    output_png = os.path.join(save_path, f'poynting_t{t_val:.2e}.png')
+    plt.savefig(output_png, bbox_inches='tight')
+    plt.close()
+
+
+def plot_spatial_residuals(model, t_val, N=50, save_path='results/'):
+    """
+    Muestra un mapa espacial de los residuos de las ecuaciones de Maxwell.
+    Punto 2: Monitoreo del Residuo Físico.
+    """
+    from physics import maxwell_residuals
+    safe_makedirs(save_path)
+    device = get_model_device(model)
+    
+    x_lin = np.linspace(0.05, 0.95, N)
+    y_lin = np.linspace(0.05, 0.95, N)
+    X, Y = np.meshgrid(x_lin, y_lin, indexing='ij')
+    
+    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1).to(device).requires_grad_(True)
+    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1).to(device).requires_grad_(True)
+    t_t = torch.tensor(np.full_like(X.flatten(), t_val), dtype=torch.float32).unsqueeze(1).to(device).requires_grad_(True)
+    
+    res_dict = maxwell_residuals(model, x_t, y_t, t_t)
+    
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10), dpi=150)
+    fig.suptitle(f"Distribución Espacial del Residuo PDE | t = {t_val:.2e}s", fontsize=14)
+    
+    equations = [
+        (res_dict['faraday_x'], 'Faraday X', axes[0, 0]),
+        (res_dict['faraday_y'], 'Faraday Y', axes[0, 1]),
+        (res_dict['ampere'], 'Ampère-Maxwell', axes[1, 0]),
+        (res_dict['gauss_b'], 'Gauss Magnética', axes[1, 1])
+    ]
+    
+    for res, name, ax in equations:
+        r_np = torch.abs(res).detach().cpu().numpy().reshape(N, N)
+        im = ax.imshow(r_np.T, extent=[0, L, 0, L], origin='lower', cmap='inferno')
+        ax.set_title(f"Residuo {name}")
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    output_png = os.path.join(save_path, f'spatial_residuals_t{t_val:.2e}.png')
+    plt.savefig(output_png)
+    plt.close()
+
+
 if __name__ == '__main__':
     # =========================================================================
     # INSTRUCCIONES DE USO AUTÓNOMO / DEBUGGING GRAFOLÓGICO

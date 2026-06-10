@@ -10,6 +10,7 @@ import metrics
 import visualization
 import higher_mode
 import sensitivity
+import validation
 from model import FCN
 
 # ─── Configuración Global de Arquitectura ─────────────────────────────────────
@@ -138,6 +139,7 @@ def main():
     parser.add_argument('--full-pipeline', action='store_true', help="Pase OMNI: Entrena, Mide, Documenta y Grafica de una vez.")
     parser.add_argument('--higher-mode',   action='store_true', help="Corre el test experimental en TM21 contra TM11.")
     parser.add_argument('--sensitivity',   action='store_true', help="Dispara el analizador de hiper-sensibilidad paramétrica.")
+    parser.add_argument('--validate',      action='store_true', help="Ejecuta el protocolo de validación rigurosa (4 pruebas clave).")
     parser.add_argument('--quick',         action='store_true', help="Bandera Dummy: Fuerza epochs=50 para validar el pipeline.")
     parser.add_argument('--plot-history',  action='store_true', help="Acompañado de Train, solicita gráfica de los epochs.")
 
@@ -205,6 +207,9 @@ def main():
         sensitivity.print_sensitivity_tables(da, dc, dl)
         sensitivity.plot_sensitivity_results(da, dc, dl)
         print("[+] Reporte de Sensibilidad concluido.")
+
+    elif args.validate:
+        validation.main()
 
     else:
         # Default o sin argumentos

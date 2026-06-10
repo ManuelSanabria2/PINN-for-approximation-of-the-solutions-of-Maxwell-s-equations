@@ -3,16 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Maxwell PINN — Faraday Digital</title>
-  
-  <!-- Fonts -->
+  <title>Faraday Digital — Maxwell PINN</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  
-  <!-- Styles -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  
-  <!-- Three.js Import Map -->
   <script type="importmap">
     {
       "imports": {
@@ -32,100 +26,317 @@
   <p style="color: var(--text-muted); font-size: 11px; margin-top: 5px;">Sincronizando campos electromagnéticos...</p>
 </div>
 
-<canvas id="c"></canvas>
-
-<div id="status-bar">
-  <div id="mode-badge" class="badge glass analytical">Analítica</div>
-  <div class="metric glass">FPS <b id="s-fps">60</b></div>
-  <div class="metric glass">Ez <b id="s-ez">0.000</b></div>
-  <div class="metric glass">|B| <b id="s-bm">0.000</b></div>
-</div>
-
-<div id="sidebar" class="glass">
-  <div class="panel-header">
-    <h1>Faraday Digital</h1>
-    <p>Solucionador Maxwell PINN Modo TM₁₁</p>
+<!-- ═══ TOPBAR ═══ -->
+<div id="topbar">
+  <div class="topbar-left">
+    <span class="topbar-title">Faraday Digital</span>
+    <span class="topbar-subtitle">Physics-Informed Neural Networks</span>
   </div>
-
-  <div class="section">
-    <h2>Control Temporal</h2>
-    <div class="row"><span class="lbl">Tiempo t</span><span class="val" id="v-t">0.000 s</span></div>
-    <input type="range" id="sl-t" min="0" max="2.828" step="0.004" value="0">
-    <div class="row"><span class="lbl">Velocidad</span><span class="val" id="v-sp">1.0x</span></div>
-    <input type="range" id="sl-sp" min="0.1" max="4" step="0.1" value="1">
-    <button class="btn" id="btn-play">Pausar Simulación</button>
-  </div>
-
-  <div class="section">
-    <h2>Espacio de Trabajo</h2>
-    <div class="seg-ctrl">
-      <div class="seg-btn active" data-axis="xy">PLANO XY</div>
-      <div class="seg-btn" data-axis="xz">PLANO XT</div>
-      <div class="seg-btn" data-axis="yz">PLANO YT</div>
+  <div class="topbar-right">
+    <div class="topbar-item">
+      <span class="eyebrow">Estado</span>
+      <span class="mono-value" id="mode-badge">Analítica</span>
     </div>
-    <div id="pos-wrap" style="display:none">
-      <div class="row"><span class="lbl">Corte en Eje</span><span class="val" id="v-pos">0.50</span></div>
-      <input type="range" id="sl-pos" min="0.02" max="0.98" step="0.01" value="0.5">
+    <div class="topbar-item">
+      <span class="eyebrow">FPS</span>
+      <span class="mono-value" id="s-fps">60</span>
     </div>
-    <div class="row"><span class="lbl">Malla</span><span class="val" id="v-res">64</span></div>
-    <input type="range" id="sl-res" min="24" max="96" step="8" value="64">
-  </div>
-
-  <div class="section">
-    <h2>Visualización</h2>
-    <select id="field-mode">
-      <option value="ez">Campo Eléctrico Ez</option>
-      <option value="bmag" selected>Magnitud Magnética |B|</option>
-      <option value="energy">Densidad de Energía</option>
-      <option value="residual">Residual PDE (Físico)</option>
-    </select>
-    <div class="row"><span class="lbl">Líneas RK4</span><div class="toggle on" id="tog-stream"></div></div>
-    <div class="row"><span class="lbl">Vectores B</span><div class="toggle on" id="tog-vec"></div></div>
-    <div class="row"><span class="lbl">Colocación</span><div class="toggle on" id="tog-ghost"></div></div>
-    <div class="row"><span class="lbl">Frontera PEC</span><div class="toggle on" id="tog-box"></div></div>
-  </div>
-
-  <div class="section">
-    <h2>Física del Medio</h2>
-    <div class="row"><span class="lbl">ε_r</span><span class="val" id="v-eps">1.00</span></div>
-    <input type="range" id="sl-eps" min="1" max="10" step="0.25" value="1">
-    <div class="row"><span class="lbl">μ_r</span><span class="val" id="v-mu">1.00</span></div>
-    <input type="range" id="sl-mu" min="1" max="5" step="0.25" value="1">
-    <div class="row"><span class="lbl">Freq. Fuente</span><span class="val" id="v-freq">1.00x</span></div>
-    <input type="range" id="sl-freq" min="0.5" max="2.5" step="0.05" value="1">
-    <div class="row"><span class="lbl">Damping</span><span class="val" id="v-sigma">0.00</span></div>
-    <input type="range" id="sl-sigma" min="0" max="0.7" step="0.02" value="0">
+    <div class="topbar-item">
+      <span class="eyebrow">Ez</span>
+      <span class="mono-value" id="s-ez">0.000</span>
+    </div>
+    <div class="topbar-item">
+      <span class="eyebrow">|B|</span>
+      <span class="mono-value" id="s-bm">0.000</span>
+    </div>
   </div>
 </div>
 
-<div id="colorbar" class="glass">
-  <span class="cb-lbl" id="cb-max">+1.00</span>
-  <div id="cb-grad"></div>
-  <span class="cb-lbl" id="cb-min">0.00</span>
-  <span class="cb-lbl" style="font-weight:700; margin-top:4px;" id="cb-title">|B|</span>
+<!-- ═══ LAYOUT ═══ -->
+<div class="layout">
+
+  <!-- ─── MAIN AREA ─── -->
+  <div class="main-area">
+
+    <!-- Viewport 3D -->
+    <div class="viewport-card">
+      <div class="viewport-header">
+        <span class="eyebrow">Visualizaci&oacute;n 3D &mdash; Cavidad TM<sub>11</sub></span>
+        <span class="viewport-badge">Cavidad TM<sub>11</sub></span>
+      </div>
+      <div class="viewport-body">
+        <canvas id="c"></canvas>
+        <div id="colorbar">
+          <span class="cb-lbl" id="cb-max">+1.00</span>
+          <div id="cb-grad"></div>
+          <span class="cb-lbl" id="cb-min">0.00</span>
+          <span class="cb-lbl" id="cb-title">|B|</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline -->
+    <div class="pipeline-card">
+      <div class="pipeline-step" id="step-colloc">
+        <span class="step-num">01</span>
+        <span class="step-label">Puntos de Colocaci&oacute;n</span>
+        <span class="step-desc">Muestreo continuo (x, y, t)</span>
+      </div>
+      <div class="pipeline-step" id="step-pinn">
+        <span class="step-num">02</span>
+        <span class="step-label">Red Neuronal</span>
+        <span class="step-desc">Fourier Features + MLP</span>
+      </div>
+      <div class="pipeline-step" id="step-fields">
+        <span class="step-num">03</span>
+        <span class="step-label">Campos Aproximados</span>
+        <span class="step-desc">Ez, Bx, By simult&aacute;neos</span>
+      </div>
+      <div class="pipeline-step" id="step-pde">
+        <span class="step-num">04</span>
+        <span class="step-label">Ecuaciones Maxwell</span>
+        <span class="step-desc">Gradientes v&iacute;a Autograd</span>
+      </div>
+      <div class="pipeline-step" id="step-loss">
+        <span class="step-num">05</span>
+        <span class="step-label">P&eacute;rdida Residual</span>
+        <span class="step-desc">Adam + L-BFGS</span>
+      </div>
+    </div>
+
+    <!-- Validation (collapsible) -->
+    <div class="fold-section">
+      <div class="fold-header" id="fold-toggle" onclick="this.parentElement.classList.toggle('expanded')">
+        <span class="fold-arrow">&#9654;</span>
+        <span class="eyebrow" style="display:inline;font-size:9px;">Validaci&oacute;n PINN vs Anal&iacute;tica</span>
+        <span class="fold-count" id="fold-count"></span>
+      </div>
+      <div class="fold-body" id="fold-body">
+        <div class="validation-grid">
+          <div class="val-card">
+            <div class="val-card-header"><h4>Ez &mdash; PINN</h4><span class="val-badge pinn">PINN</span></div>
+            <div class="val-card-body"><canvas id="cmp-pinn" width="120" height="120"></canvas></div>
+          </div>
+          <div class="val-card">
+            <div class="val-card-header"><h4>Ez &mdash; Anal&iacute;tica</h4><span class="val-badge analytical">Anal&iacute;tica</span></div>
+            <div class="val-card-body"><canvas id="cmp-analytical" width="120" height="120"></canvas></div>
+          </div>
+          <div class="val-card">
+            <div class="val-card-header"><h4>|Error| Absoluto</h4><span class="val-badge pinn" style="background:var(--surface);color:var(--text-muted);border:1px solid var(--border);">L2</span></div>
+            <div class="val-card-body"><canvas id="cmp-error" width="120" height="120"></canvas></div>
+          </div>
+          <div class="val-card">
+            <div class="val-card-header"><h4>Resumen</h4><span class="val-badge analytical">M&eacute;tricas</span></div>
+            <div class="val-card-body" id="cmp-summary" style="padding:8px;font-size:10px;color:var(--text-muted);display:flex;flex-direction:column;justify-content:center;">
+              Cargando...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ─── SIDEBAR ─── -->
+  <div class="sidebar">
+
+    <!-- Temporal Control -->
+    <div class="sidebar-section">
+      <span class="eyebrow">Control temporal</span>
+      <div class="slider-row">
+        <span class="lbl">Tiempo t</span>
+        <span class="mono-value" id="v-t">0.000 s</span>
+      </div>
+      <input type="range" id="sl-t" min="0" max="2.828" step="0.004" value="0">
+      <div class="slider-limits"><span>0.00s</span><span>2.83s (2T)</span></div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span class="lbl">Velocidad</span>
+        <span class="mono-value" id="v-sp">1.0x</span>
+      </div>
+      <input type="range" id="sl-sp" min="0.1" max="4" step="0.1" value="1">
+      <div class="slider-limits"><span>0.1x</span><span>4.0x</span></div>
+      <button class="btn" id="btn-play" style="margin-top:4px;">Pausar Simulaci&oacute;n</button>
+    </div>
+
+    <!-- Cut Plane -->
+    <div class="sidebar-section">
+      <span class="eyebrow">Plano de corte</span>
+      <div class="seg-ctrl">
+        <div class="seg-btn active" data-axis="xy">XY</div>
+        <div class="seg-btn" data-axis="xz">XT</div>
+        <div class="seg-btn" data-axis="yz">YT</div>
+      </div>
+      <div id="pos-wrap" style="display:none">
+        <div class="slider-row">
+          <span class="lbl">Corte</span>
+          <span class="mono-value" id="v-pos">0.50</span>
+        </div>
+        <input type="range" id="sl-pos" min="0.02" max="0.98" step="0.01" value="0.5">
+      </div>
+      <div class="slider-row" style="margin-top:6px;">
+        <span class="lbl">Resoluci&oacute;n</span>
+        <span class="mono-value" id="v-res">64</span>
+      </div>
+      <input type="range" id="sl-res" min="24" max="96" step="8" value="64">
+      <div class="slider-limits"><span>24&times;24</span><span>96&times;96</span></div>
+    </div>
+
+    <!-- Visualization Layers -->
+    <div class="sidebar-section">
+      <span class="eyebrow">Capas de visualizaci&oacute;n</span>
+      <select class="field-select" id="field-mode">
+        <option value="ez">Campo El&eacute;ctrico Ez</option>
+        <option value="bmag" selected>Magnitud Magn&eacute;tica |B|</option>
+        <option value="energy">Densidad de Energ&iacute;a</option>
+        <option value="residual">Residual PDE</option>
+      </select>
+      <div class="toggle-row">
+        <span class="lbl">Curvas de Nivel</span>
+        <div class="toggle-dot on" id="tog-contours"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="lbl">Streamlines RK4</span>
+        <div class="toggle-dot on" id="tog-stream"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="lbl">Vectores B</span>
+        <div class="toggle-dot on" id="tog-vec"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="lbl">Malla Fantasma</span>
+        <div class="toggle-dot on" id="tog-ghost"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="lbl">Frontera PEC</span>
+        <div class="toggle-dot on" id="tog-box"></div>
+      </div>
+    </div>
+
+    <!-- Medium Physics -->
+    <div class="sidebar-section">
+      <span class="eyebrow">F&iacute;sica del medio</span>
+      <div class="slider-row">
+        <span class="lbl">&epsilon;<sub>r</sub></span>
+        <span class="mono-value" id="v-eps">1.00</span>
+      </div>
+      <input type="range" id="sl-eps" min="1" max="10" step="0.25" value="1">
+      <div class="slider-limits"><span>1.0 (Vac&iacute;o)</span><span>10.0</span></div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span class="lbl">&mu;<sub>r</sub></span>
+        <span class="mono-value" id="v-mu">1.00</span>
+      </div>
+      <input type="range" id="sl-mu" min="1" max="5" step="0.25" value="1">
+      <div class="slider-limits"><span>1.0 (Vac&iacute;o)</span><span>5.0</span></div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span class="lbl">Frecuencia</span>
+        <span class="mono-value" id="v-freq">1.00x</span>
+      </div>
+      <input type="range" id="sl-freq" min="0.5" max="2.5" step="0.05" value="1">
+      <div class="slider-limits"><span>0.5x</span><span>2.5x</span></div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span class="lbl">P&eacute;rdidas</span>
+        <span class="mono-value" id="v-sigma">0.00</span>
+      </div>
+      <input type="range" id="sl-sigma" min="0" max="0.7" step="0.02" value="0">
+      <div class="slider-limits"><span>0.0</span><span>0.7</span></div>
+    </div>
+
+    <!-- Maxwell Residuals -->
+    <div class="sidebar-section">
+      <span class="eyebrow">Residuales Maxwell</span>
+      <div class="residual-list">
+        <div class="residual-item">
+          <div class="res-head">
+            <span class="res-name">Faraday X</span>
+            <span class="res-value" id="res-fx" style="color:var(--text-muted)">--</span>
+          </div>
+          <div class="res-bar-bg"><div class="res-bar" id="bar-fx"></div></div>
+        </div>
+        <div class="residual-item">
+          <div class="res-head">
+            <span class="res-name">Faraday Y</span>
+            <span class="res-value" id="res-fy" style="color:var(--text-muted)">--</span>
+          </div>
+          <div class="res-bar-bg"><div class="res-bar" id="bar-fy"></div></div>
+        </div>
+        <div class="residual-item">
+          <div class="res-head">
+            <span class="res-name">Amp&egrave;re</span>
+            <span class="res-value" id="res-am" style="color:var(--text-muted)">--</span>
+          </div>
+          <div class="res-bar-bg"><div class="res-bar" id="bar-am"></div></div>
+        </div>
+        <div class="residual-item">
+          <div class="res-head">
+            <span class="res-name">Gauss B</span>
+            <span class="res-value" id="res-ga" style="color:var(--text-muted)">--</span>
+          </div>
+          <div class="res-bar-bg"><div class="res-bar" id="bar-ga"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
-<div id="res-panel" class="glass">
-  <h3>Diagnóstico de Residuales Maxwell</h3>
-  <div class="res-row">
-    <div class="res-info"><span>Faraday Eje X</span><b id="res-fx">--</b></div>
-    <div class="res-bar-bg"><div class="res-bar" id="bar-fx"></div></div>
+<!-- ═══ HIDDEN STUBS (JS COMPATIBILITY) ═══ -->
+<div id="hero-panel" style="display:none">
+  <div class="hero-header">
+    <div class="hero-title-group">
+      <span class="hero-tag">Physics-Informed Neural Networks</span>
+      <h2>C&aacute;mara de Faraday Digital</h2>
+    </div>
+    <button id="btn-hero-toggle" class="btn-icon"></button>
   </div>
-  <div class="res-row">
-    <div class="res-info"><span>Faraday Eje Y</span><b id="res-fy">--</b></div>
-    <div class="res-bar-bg"><div class="res-bar" id="bar-fy"></div></div>
+  <div class="hero-body">
+    <div class="hero-tabs">
+      <button class="tab-btn active" data-tab="tab-hace"></button>
+      <button class="tab-btn" data-tab="tab-funciona"></button>
+      <button class="tab-btn" data-tab="tab-ecuaciones"></button>
+      <button class="tab-btn" data-tab="tab-visualiza"></button>
+    </div>
+    <div class="tab-panes">
+      <div class="tab-pane active" id="tab-hace"></div>
+      <div class="tab-pane" id="tab-funciona"></div>
+      <div class="tab-pane" id="tab-ecuaciones"></div>
+      <div class="tab-pane" id="tab-visualiza"></div>
+    </div>
   </div>
-  <div class="res-row">
-    <div class="res-info"><span>Ley de Ampère</span><b id="res-am">--</b></div>
-    <div class="res-bar-bg"><div class="res-bar" id="bar-am"></div></div>
-  </div>
-  <div class="res-row">
-    <div class="res-info"><span>Ley de Gauss B</span><b id="res-ga">--</b></div>
-    <div class="res-bar-bg"><div class="res-bar" id="bar-ga"></div></div>
-  </div>
-  <canvas id="res-chart"></canvas>
 </div>
+<div id="compare-panel" style="display:none"></div>
+<div id="diag-panel" style="display:none">
+  <h3>Diagn&oacute;stico de Entrenamiento</h3>
+  <div class="diag-chart-wrap">
+    <div class="diag-chart-box"><canvas id="diag-loss"></canvas><span class="diag-chart-label">P&eacute;rdida vs &Eacute;pocas</span></div>
+    <div class="diag-chart-box"><canvas id="diag-residual"></canvas><span class="diag-chart-label">Residuales PDE</span></div>
+    <div class="diag-chart-box" style="flex:0.6;"><div style="padding:6px;font-size:9px;color:var(--text-muted);"><div id="diag-params"></div></div></div>
+  </div>
+</div>
+<div id="mode-selector" style="display:none">
+  <select id="sim-mode">
+    <option value="cavity">Cavidad Resonante TM&#8321;&#8321;</option>
+    <option value="propagation">Propagaci&oacute;n de Onda</option>
+    <option value="gaussian">Pulso Gaussiano</option>
+    <option value="antenna">Emisi&oacute;n de Antena</option>
+  </select>
+  <select id="model-selector">
+    <option value="auto">Autom&aacute;tico</option>
+    <option value="pinn">PINN</option>
+    <option value="analytical">Anal&iacute;tico</option>
+    <option value="comparison">Comparaci&oacute;n</option>
+  </select>
+</div>
+<div id="export-panel" style="display:none">
+  <button class="export-btn" id="export-png">PNG</button>
+  <button class="export-btn" id="export-csv">CSV</button>
+  <button class="export-btn" id="export-json">JSON</button>
+  <button class="export-btn" id="export-config">Config</button>
+  <button class="export-btn" id="btn-benchmark">Benchmark</button>
+  <span id="export-status" style="font-size:8px;color:var(--text-muted);"></span>
+</div>
+<div id="compare-toggle-btn" style="display:none"></div>
 
+<!-- ═══ SCRIPT ═══ -->
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -140,13 +351,12 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const S = {
   t: 0, axis: 'xy', position: 0.5, eps_r: 1, mu_r: 1, freq_scale: 1, sigma_wall: 0,
   speed: 1, playing: true, resolution: 64, fieldMode: 'bmag',
-  showGhost: true, showVec: true, showBox: true, showStream: true,
+  showGhost: true, showVec: true, showBox: true, showStream: true, showContours: true,
   usePINN: false, sliceData: null, gridData: null, residualMap: null,
   fetchPending: false, gridPending: false, resPending: false,
   lastFetch: 0, lastGrid: 0, lastResidual: 0, residualHistory: []
 };
 
-// ── UI Colors ──
 const infernoMap = [[0,0,4],[40,11,84],[101,21,110],[159,42,99],[212,72,66],[245,125,21],[252,187,54],[252,255,164]];
 const divergeMap = [[33,102,172],[103,169,207],[209,229,240],[247,247,247],[253,219,199],[239,138,98],[178,24,43]];
 
@@ -156,7 +366,6 @@ function getColor(v, min, max, map) {
   return map[i].map((a, k) => Math.round(a + (map[i+1][k] - a) * u));
 }
 
-// ── Physics ──
 function fieldAt(x, y, t) {
   const te = tEff(t, S.eps_r, S.mu_r, S.freq_scale);
   const a = damp(t, S.sigma_wall);
@@ -166,27 +375,39 @@ function fieldAt(x, y, t) {
   return { Ez, Bx, By };
 }
 
-// ── Three.js Init ──
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.setClearColor(0x0a0c10, 1);
+
+function updateRendererSize() {
+  const container = canvas.parentElement;
+  if (!container) return;
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  if (w > 0 && h > 0) {
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+}
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(45, 1.6, 0.1, 100);
+updateRendererSize();
+const ro = new ResizeObserver(updateRendererSize);
+ro.observe(canvas.parentElement);
 camera.position.set(2.2, 1.8, 2.2);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.target.set(0.5, 0.5, 0.5);
 
-// Lights
 scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 const dLight = new THREE.DirectionalLight(0xffffff, 1);
 dLight.position.set(2, 5, 3);
 scene.add(dLight);
 
-// Box
 const boxLine = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.01, 1.01, 1.01)),
   new THREE.LineBasicMaterial({ color: 0x4b5563, transparent: true, opacity: 0.5 })
@@ -194,7 +415,6 @@ const boxLine = new THREE.LineSegments(
 boxLine.position.set(0.5, 0.5, 0.5);
 scene.add(boxLine);
 
-// Main Slice Mesh
 let sliceArr = new Uint8Array(S.resolution * S.resolution * 3);
 let sliceTex = new THREE.DataTexture(sliceArr, S.resolution, S.resolution, THREE.RGBFormat);
 const sliceMesh = new THREE.Mesh(
@@ -203,14 +423,99 @@ const sliceMesh = new THREE.Mesh(
 );
 scene.add(sliceMesh);
 
-// Arrows & Streamlines
-const arrowCount = 100;
-const arrowMesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.015, 0.08, 8), new THREE.MeshPhongMaterial(), arrowCount);
+const vectorGridSize = 15;
+const arrowCount = vectorGridSize * vectorGridSize;
+const arrowShape = new THREE.Shape();
+arrowShape.moveTo(0.015, 0);
+arrowShape.lineTo(-0.015, 0.01);
+arrowShape.lineTo(-0.005, 0);
+arrowShape.lineTo(-0.015, -0.01);
+arrowShape.lineTo(0.015, 0);
+const arrowGeometry = new THREE.ShapeGeometry(arrowShape);
+const arrowMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.9,
+  side: THREE.DoubleSide
+});
+const arrowMesh = new THREE.InstancedMesh(arrowGeometry, arrowMaterial, arrowCount);
 scene.add(arrowMesh);
-const streamGroup = new THREE.Group();
-scene.add(streamGroup);
 
-// ── API Functions ──
+const particleCount = 400;
+const particleGeometry = new THREE.BufferGeometry();
+const particlePositions = new Float32Array(particleCount * 3);
+const particleLifetimes = new Float32Array(particleCount);
+for(let i=0; i<particleCount; i++) {
+  particlePositions[i*3] = Math.random();
+  particlePositions[i*3+1] = Math.random();
+  particlePositions[i*3+2] = 0.5;
+  particleLifetimes[i] = Math.random();
+}
+particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+particleGeometry.setAttribute('lifetime', new THREE.BufferAttribute(particleLifetimes, 1));
+
+const particleMaterial = new THREE.PointsMaterial({
+  size: 0.015,
+  color: 0x00ffff,
+  transparent: true,
+  opacity: 0.8,
+  blending: THREE.AdditiveBlending
+});
+const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+scene.add(particleSystem);
+
+const ghostCount = 1000;
+const ghostGeometry = new THREE.BufferGeometry();
+const ghostPositions = new Float32Array(ghostCount * 3);
+for (let i = 0; i < ghostCount; i++) {
+  ghostPositions[i*3] = Math.random();
+  ghostPositions[i*3+1] = Math.random();
+  ghostPositions[i*3+2] = Math.random();
+}
+ghostGeometry.setAttribute('position', new THREE.BufferAttribute(ghostPositions, 3));
+const ghostMaterial = new THREE.PointsMaterial({
+  size: 0.007,
+  color: 0x60a5fa,
+  transparent: true,
+  opacity: 0.35,
+  blending: THREE.AdditiveBlending
+});
+const ghostPoints = new THREE.Points(ghostGeometry, ghostMaterial);
+scene.add(ghostPoints);
+
+const boxHoverGeom = new THREE.BoxGeometry(1.02, 1.02, 1.02);
+const boxHoverMat = new THREE.MeshBasicMaterial({ visible: false });
+const boxHoverMesh = new THREE.Mesh(boxHoverGeom, boxHoverMat);
+boxHoverMesh.position.set(0.5, 0.5, 0.5);
+scene.add(boxHoverMesh);
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tooltip = document.createElement('div');
+tooltip.id = 'cage-tooltip';
+tooltip.style.position = 'absolute';
+tooltip.style.display = 'none';
+tooltip.style.pointerEvents = 'none';
+tooltip.style.padding = '10px 14px';
+tooltip.style.fontSize = '12px';
+tooltip.style.color = 'var(--text-secondary)';
+tooltip.style.background = 'var(--surface)';
+tooltip.style.border = '1px solid var(--border)';
+tooltip.style.borderRadius = '8px';
+tooltip.style.zIndex = '1000';
+tooltip.style.maxWidth = '260px';
+tooltip.innerHTML = `<strong>Jaula de Faraday (Cavidad PEC)</strong><br><br>
+Esta caja delimita las paredes conductoras perfectas (PEC). Las condiciones de contorno forzan que las componentes tangenciales del campo el&eacute;ctrico se anulen en las paredes. Esto confina y resuena la energ&iacute;a electromagn&eacute;tica del modo TM<sub>11</sub> en su interior.`;
+document.body.appendChild(tooltip);
+
+window.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  tooltip.style.left = (e.clientX + 15) + 'px';
+  tooltip.style.top = (e.clientY + 15) + 'px';
+});
+
 async function checkAPI() {
   try {
     const r = await fetch(`${API}/api/health`);
@@ -227,30 +532,116 @@ async function checkAPI() {
 
 function updateBadge() {
   const el = document.getElementById('mode-badge');
-  el.textContent = S.usePINN ? 'PINN Activo' : 'Analítica';
+  el.textContent = S.usePINN ? 'PINN Activo' : 'Anal&iacute;tica';
   el.className = `badge glass ${S.usePINN ? 'pinn' : 'analytical'}`;
 }
 
 async function updateData() {
-  if (S.fetchPending) return;
-  S.fetchPending = true;
-  
-  const payload = {
-    t: S.t, N: S.resolution, axis: S.axis, position: S.position,
-    eps_r: S.eps_r, mu_r: S.mu_r, freq_scale: S.freq_scale, sigma_wall: S.sigma_wall
-  };
+  const now = performance.now();
 
-  try {
-    if (S.usePINN) {
-      const r = await fetch(`${API}/slice`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-      if (r.ok) S.sliceData = await r.json();
-    } else {
-      S.sliceData = analyticalSlice(S.resolution, S.axis, S.position, S.t);
+  if (!S.fetchPending && now - S.lastFetch > 80) {
+    S.fetchPending = true;
+    const payload = {
+      t: S.t, N: S.resolution, axis: S.axis, position: S.position,
+      eps_r: S.eps_r, mu_r: S.mu_r, freq_scale: S.freq_scale, sigma_wall: S.sigma_wall
+    };
+    try {
+      if (S.usePINN) {
+        const r = await fetch(`${API}/slice`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        if (r.ok) S.sliceData = await r.json();
+      } else {
+        S.sliceData = analyticalSlice(S.resolution, S.axis, S.position, S.t);
+      }
+    } catch { S.usePINN = false; updateBadge(); }
+    applySlice();
+    S.lastFetch = now;
+    S.fetchPending = false;
+  }
+
+  if (!S.resPending && now - S.lastResidual > 1000) {
+    S.resPending = true;
+    try {
+      if (S.usePINN) {
+        const r = await fetch(`${API}/residuals`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ t: S.t, N: 15, eps_r: S.eps_r, mu_r: S.mu_r, freq_scale: S.freq_scale }) });
+        if (r.ok) updateResidualPanel(await r.json());
+      }
+    } catch {}
+    S.lastResidual = now;
+    S.resPending = false;
+  }
+}
+
+function updateResidualPanel(res) {
+  const ids = { fx: 'faraday_x', fy: 'faraday_y', am: 'ampere', ga: 'gauss_b' };
+  for (const [key, apiName] of Object.entries(ids)) {
+    const val = res[apiName];
+    if (val === undefined) continue;
+    document.getElementById(`res-${key}`).textContent = val.toExponential(1);
+    document.getElementById(`res-${key}`).style.color = val < 1e-3 ? 'var(--success)' : (val < 1e-2 ? 'var(--warning)' : 'var(--error)');
+    const bar = document.getElementById(`bar-${key}`);
+    if (bar) {
+      bar.style.width = Math.min(100, Math.max(5, (val/1e-2)*100)) + '%';
+      bar.style.background = val < 1e-3 ? 'var(--success)' : (val < 1e-2 ? 'var(--warning)' : 'var(--error)');
     }
-  } catch { S.usePINN = false; updateBadge(); }
-  
-  applySlice();
-  S.fetchPending = false;
+  }
+}
+
+function applyVectors() {
+  if (!S.showVec) { arrowMesh.count = 0; return; }
+  const dummy = new THREE.Object3D();
+  let idx = 0;
+  const N = vectorGridSize;
+  const maxMag = 0.35;
+
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const x = 0.05 + (i / (N-1)) * 0.9;
+      const y = 0.05 + (j / (N-1)) * 0.9;
+      const f = fieldAt(x, y, S.t);
+      const bx = f.Bx, by = f.By;
+      const mag = Math.hypot(bx, by);
+      dummy.position.set(x, y, S.axis === 'xy' ? S.t / T_MAX + 0.005 : 0.505);
+      if (mag > maxMag * 0.05) {
+        const angle = Math.atan2(by, bx);
+        dummy.rotation.set(0, 0, angle);
+        const lengthScale = clamp(mag / maxMag * 2.0, 0.2, 2.5);
+        dummy.scale.set(lengthScale, lengthScale, 1.0);
+        const hue = 0.7 - clamp(mag / maxMag, 0, 1) * 0.7;
+        arrowMesh.setColorAt(idx, new THREE.Color().setHSL(hue, 1.0, 0.5));
+      } else {
+        dummy.scale.set(0, 0, 0);
+        arrowMesh.setColorAt(idx, new THREE.Color(0,0,0));
+      }
+      dummy.updateMatrix();
+      arrowMesh.setMatrixAt(idx, dummy.matrix);
+      idx++;
+    }
+  }
+  arrowMesh.count = idx;
+  arrowMesh.instanceMatrix.needsUpdate = true;
+  if(arrowMesh.instanceColor) arrowMesh.instanceColor.needsUpdate = true;
+}
+
+function updateStreamlines(dt) {
+  particleSystem.visible = S.showStream;
+  if (!S.showStream) return;
+  const positions = particleSystem.geometry.attributes.position.array;
+  const lifetimes = particleSystem.geometry.attributes.lifetime.array;
+  for(let i=0; i<particleCount; i++) {
+    lifetimes[i] -= dt * 0.5;
+    let x = positions[i*3], y = positions[i*3+1];
+    const field = fieldAt(x, y, S.t);
+    const speed = 0.5;
+    x += field.Bx * speed * dt;
+    y += field.By * speed * dt;
+    if (lifetimes[i] < 0 || x < 0 || x > 1 || y < 0 || y > 1) {
+      x = Math.random(); y = Math.random();
+      lifetimes[i] = 1.0;
+    }
+    positions[i*3] = x; positions[i*3+1] = y;
+    positions[i*3+2] = S.axis === 'xy' ? S.t / T_MAX + 0.01 : 0.51;
+  }
+  particleSystem.geometry.attributes.position.needsUpdate = true;
 }
 
 function analyticalSlice(N, axis, pos, t) {
@@ -278,11 +669,11 @@ function applySlice() {
     sliceTex = new THREE.DataTexture(sliceArr, N, N, THREE.RGBFormat);
     sliceMesh.material.map = sliceTex;
   }
-  
+
   let matrix = [];
   let min = 0, max = 1;
   const m = S.fieldMode;
-  
+
   for (let j = 0; j < N; j++) {
     const row = [];
     for (let i = 0; i < N; i++) {
@@ -304,21 +695,32 @@ function applySlice() {
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
       const idx = (j * N + i) * 3;
-      const rgb = getColor(matrix[j][i], min, max, m === 'ez' ? divergeMap : infernoMap);
+      let rgb = getColor(matrix[j][i], min, max, m === 'ez' ? divergeMap : infernoMap);
+
+      if (S.showContours) {
+        const val = matrix[j][i];
+        const normVal = (val - min) / (max - min || 1);
+        const numLevels = 8;
+        const levelVal = normVal * numLevels;
+        const roundLevel = Math.round(levelVal);
+        const dist = Math.abs(levelVal - roundLevel);
+        if (dist < 0.06) {
+          rgb = m === 'ez' ? [0, 0, 0] : [255, 255, 255];
+        }
+      }
+
       sliceArr[idx] = rgb[0]; sliceArr[idx+1] = rgb[1]; sliceArr[idx+2] = rgb[2];
     }
   }
   sliceTex.needsUpdate = true;
-  
-  // UI Update
+
   document.getElementById('cb-max').textContent = max.toFixed(2);
   document.getElementById('cb-min').textContent = min.toFixed(2);
-  document.getElementById('cb-grad').style.background = m === 'ez' 
-    ? 'linear-gradient(to top, #2166ac, #f7f7f7, #b2182b)' 
+  document.getElementById('cb-grad').style.background = m === 'ez'
+    ? 'linear-gradient(to top, #2166ac, #f7f7f7, #b2182b)'
     : 'linear-gradient(to top, #000004, #de4968, #fcfdbf)';
 }
 
-// ── Main Loop ──
 let lastT = performance.now();
 function animate() {
   requestAnimationFrame(animate);
@@ -333,18 +735,64 @@ function animate() {
   }
 
   updateData();
+  applyVectors();
 
   sliceMesh.position.set(S.axis === 'yz' ? S.position : 0.5, S.axis === 'xz' ? S.position : 0.5, S.axis === 'xy' ? S.t / T_MAX : 0.5);
   sliceMesh.rotation.set(S.axis === 'xz' ? -Math.PI/2 : 0, S.axis === 'yz' ? -Math.PI/2 : 0, 0);
+
+  updateStreamlines(dt);
+
+  ghostPoints.visible = S.showGhost;
+  boxLine.visible = S.showBox;
+  arrowMesh.visible = S.showVec;
+
+  if (boxHoverMesh) {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(boxHoverMesh);
+    tooltip.style.display = (intersects.length > 0 && S.showBox) ? 'block' : 'none';
+  }
+
+  const activeStepIdx = Math.floor((S.t / T_MAX) * 5);
+  const steps = ['step-colloc', 'step-pinn', 'step-fields', 'step-pde', 'step-loss'];
+  steps.forEach((stepId, idx) => {
+    const el = document.getElementById(stepId);
+    if (el) {
+      if (idx === activeStepIdx) el.classList.add('step-active');
+      else el.classList.remove('step-active');
+    }
+  });
 
   controls.update();
   renderer.render(scene, camera);
 }
 
-// ── Events ──
-document.getElementById('sl-t').oninput = e => S.t = parseFloat(e.target.value);
-document.getElementById('sl-sp').oninput = e => S.speed = parseFloat(e.target.value);
-document.getElementById('btn-play').onclick = e => { S.playing = !S.playing; e.target.textContent = S.playing ? 'Pausar Simulación' : 'Reanudar'; };
+document.getElementById('btn-play').onclick = e => { S.playing = !S.playing; e.target.textContent = S.playing ? 'Pausar Simulaci&oacute;n' : 'Reanudar'; };
+document.getElementById('sl-t').oninput = e => { S.t = parseFloat(e.target.value); document.getElementById('v-t').textContent = S.t.toFixed(3) + ' s'; };
+document.getElementById('sl-sp').oninput = e => { S.speed = parseFloat(e.target.value); document.getElementById('v-sp').textContent = S.speed.toFixed(1) + 'x'; };
+document.getElementById('sl-eps').oninput = e => { S.eps_r = parseFloat(e.target.value); document.getElementById('v-eps').textContent = S.eps_r.toFixed(2); };
+document.getElementById('sl-mu').oninput = e => { S.mu_r = parseFloat(e.target.value); document.getElementById('v-mu').textContent = S.mu_r.toFixed(2); };
+document.getElementById('sl-freq').oninput = e => { S.freq_scale = parseFloat(e.target.value); document.getElementById('v-freq').textContent = S.freq_scale.toFixed(2) + 'x'; };
+document.getElementById('sl-sigma').oninput = e => { S.sigma_wall = parseFloat(e.target.value); document.getElementById('v-sigma').textContent = S.sigma_wall.toFixed(2); };
+document.getElementById('sl-res').oninput = e => { S.resolution = parseInt(e.target.value); document.getElementById('v-res').textContent = S.resolution; };
+document.getElementById('sl-pos').oninput = e => { S.position = parseFloat(e.target.value); document.getElementById('v-pos').textContent = S.position.toFixed(2); };
+document.getElementById('field-mode').onchange = e => { S.fieldMode = e.target.value; applySlice(); };
+
+function bindToggle(id, key, callback) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.onclick = () => {
+      S[key] = !S[key];
+      el.classList.toggle('on', S[key]);
+      if (callback) callback(S[key]);
+    };
+  }
+}
+bindToggle('tog-stream', 'showStream');
+bindToggle('tog-vec', 'showVec');
+bindToggle('tog-ghost', 'showGhost');
+bindToggle('tog-box', 'showBox');
+bindToggle('tog-contours', 'showContours', () => applySlice());
+
 document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => {
   document.querySelectorAll('.seg-btn').forEach(x => x.classList.remove('active'));
   b.classList.add('active');
@@ -352,7 +800,641 @@ document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => {
   document.getElementById('pos-wrap').style.display = S.axis === 'xy' ? 'none' : 'block';
 });
 
-// Start
+const heroPanel = document.getElementById('hero-panel');
+const btnHeroToggle = document.getElementById('btn-hero-toggle');
+if (heroPanel && btnHeroToggle) {
+  btnHeroToggle.onclick = () => {
+    heroPanel.classList.toggle('collapsed');
+    btnHeroToggle.innerHTML = heroPanel.classList.contains('collapsed') ? '&#9660;' : '&#9650;';
+  };
+}
+
+document.querySelectorAll('#hero-panel .tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#hero-panel .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#hero-panel .tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const tabId = btn.dataset.tab;
+    const pane = document.getElementById(tabId);
+    if (pane) pane.classList.add('active');
+  };
+});
+
+// ════════════════════════════════════════════
+// FASE 3 — COMPARACIÓN, DIAGNÓSTICO Y EXPORTACIÓN
+// ════════════════════════════════════════════
+
+function initComparisonPanel() {
+  const btn = document.getElementById('compare-toggle-btn');
+  const panel = document.getElementById('compare-panel');
+  if (!btn || !panel) return;
+
+  btn.onclick = () => {
+    panel.classList.toggle('visible');
+    btn.classList.toggle('active');
+    btn.textContent = panel.classList.contains('visible') ? '✕ Cerrar' : '📊 Comparar';
+    if (panel.classList.contains('visible')) fetchComparison();
+  };
+
+  document.querySelectorAll('#compare-panel .compare-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('#compare-panel .compare-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('#compare-panel .compare-tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.ctab).classList.add('active');
+      const tabId = tab.dataset.ctab;
+      if (tabId === 'ctab-fields') fetchComparison();
+      else if (tabId === 'ctab-metrics') fetchMetrics();
+      else if (tabId === 'ctab-pde') fetchResiduals();
+      else if (tabId === 'ctab-bc') fetchBCValidation();
+    };
+  });
+}
+
+async function fetchComparison() {
+  if (!S.usePINN) return;
+  try {
+    const res = await fetch(`${API}/api/compare/slice`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ N: 60, t: S.t, eps_r: S.eps_r, mu_r: S.mu_r })
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    renderComparisonCanvases(data);
+    renderComparisonSummary(data);
+  } catch (e) {
+    console.error('Comparison fetch failed:', e);
+  }
+}
+
+function renderComparisonCanvases(data) {
+  const N = data.N;
+  const pinnCanvas = document.getElementById('cmp-pinn');
+  const analCanvas = document.getElementById('cmp-analytical');
+  const errCanvas = document.getElementById('cmp-error');
+
+  if (!pinnCanvas || !analCanvas || !errCanvas) return;
+
+  const pinnCtx = pinnCanvas.getContext('2d');
+  const analCtx = analCanvas.getContext('2d');
+  const errCtx = errCanvas.getContext('2d');
+
+  pinnCanvas.width = N; pinnCanvas.height = N;
+  analCanvas.width = N; analCanvas.height = N;
+  errCanvas.width = N; errCanvas.height = N;
+  pinnCanvas.style.width = '100%'; pinnCanvas.style.height = '100%';
+  analCanvas.style.width = '100%'; analCanvas.style.height = '100%';
+  errCanvas.style.width = '100%'; errCanvas.style.height = '100%';
+
+  const pinn = data.Ez_pinn;
+  const anal = data.Ez_analytical;
+  const err = data.err_Ez;
+
+  let allMin = Infinity, allMax = -Infinity;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const v = pinn[j][i];
+      if (v < allMin) allMin = v;
+      if (v > allMax) allMax = v;
+      const va = anal[j][i];
+      if (va < allMin) allMin = va;
+      if (va > allMax) allMax = va;
+    }
+  }
+  const s = Math.max(Math.abs(allMin), Math.abs(allMax));
+  const errMax = Math.max(...err.flat()) || 1;
+
+  function drawField(ctx, data, min, max) {
+    const imgData = ctx.createImageData(N, N);
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const idx = (j * N + i) * 4;
+        const v = data[j][i];
+        const t = clamp((v - min) / (max - min || 1), 0, 1);
+        if (v >= 0) {
+          imgData.data[idx] = 253; imgData.data[idx+1] = 219; imgData.data[idx+2] = 199;
+        } else {
+          imgData.data[idx] = 103; imgData.data[idx+1] = 169; imgData.data[idx+2] = 207;
+        }
+        const alpha = Math.abs(v) / (max || 1);
+        imgData.data[idx] = Math.round(imgData.data[idx] * alpha + 255 * (1 - alpha));
+        imgData.data[idx+1] = Math.round(imgData.data[idx+1] * alpha + 255 * (1 - alpha));
+        imgData.data[idx+2] = Math.round(imgData.data[idx+2] * alpha + 255 * (1 - alpha));
+        imgData.data[idx+3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  function drawError(ctx, data) {
+    const imgData = ctx.createImageData(N, N);
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const idx = (j * N + i) * 4;
+        const t = clamp(data[j][i] / errMax, 0, 1);
+        imgData.data[idx] = Math.round(12 + 243 * t);
+        imgData.data[idx+1] = Math.round(0 + 128 * (1-t));
+        imgData.data[idx+2] = Math.round(36 + 80 * (1-t));
+        imgData.data[idx+3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  drawField(pinnCtx, pinn, -s, s);
+  drawField(analCtx, anal, -s, s);
+  drawError(errCtx, err);
+}
+
+function renderComparisonSummary(data) {
+  const m = data.metrics || {};
+  const el = document.getElementById('cmp-summary');
+  if (!el) return;
+
+  const l2ez = m.l2_Ez || 0;
+  const l2bx = m.l2_Bx || 0;
+  const l2by = m.l2_By || 0;
+  const avgL2 = (l2ez + l2bx + l2by) / 3;
+
+  const l2Class = (v) => v < 2 ? 'error-low' : (v < 10 ? 'error-mid' : 'error-high');
+
+  el.innerHTML = `
+    <div class="metric-card" style="margin-bottom:6px;width:100%;">
+      <div class="metric-label" style="font-size:9px;">Error L2 Promedio</div>
+      <div class="metric-value ${l2Class(avgL2)}" style="font-size:20px;">${avgL2.toFixed(2)}%</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:6px;width:100%;">
+      <div><div class="metric-label" style="font-size:8px;">L2 Ez</div><div class="metric-value ${l2Class(l2ez)}" style="font-size:12px;">${l2ez.toFixed(2)}%</div></div>
+      <div><div class="metric-label" style="font-size:8px;">L2 Bx</div><div class="metric-value ${l2Class(l2bx)}" style="font-size:12px;">${l2bx.toFixed(2)}%</div></div>
+      <div><div class="metric-label" style="font-size:8px;">L2 By</div><div class="metric-value ${l2Class(l2by)}" style="font-size:12px;">${l2by.toFixed(2)}%</div></div>
+    </div>
+    <div style="margin-top:8px;font-size:7px;color:var(--text-muted);">
+      MSE Ez: ${(m.mse_Ez || 0).toExponential(2)} | Bx: ${(m.mse_Bx || 0).toExponential(2)} | By: ${(m.mse_By || 0).toExponential(2)}
+    </div>
+  `;
+}
+
+async function fetchMetrics() {
+  if (!S.usePINN) return;
+  const container = document.getElementById('metrics-container');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);font-size:11px;">Consultando...</div>';
+  try {
+    const res = await fetch(`${API}/api/compare/metrics`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ N: 50, t: S.t, eps_r: S.eps_r, mu_r: S.mu_r })
+    });
+    if (!res.ok) throw new Error('Failed');
+    const data = await res.json();
+    const l2 = data.l2 || {};
+    const mse = data.mse || {};
+    const pde = data.pde_residuals || {};
+    const ene = data.energy || {};
+
+    const l2Cls = (v) => v < 2 ? 'error-low' : (v < 10 ? 'error-mid' : 'error-high');
+
+    container.innerHTML = `
+      <div style="margin-bottom:8px;">
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Error L2 Relativo (%)</div>
+        <div class="metrics-grid">
+          <div class="metric-card"><div class="metric-label">Ez</div><div class="metric-value ${l2Cls(l2.Ez)}" style="font-size:13px;">${(l2.Ez||0).toFixed(2)}%</div></div>
+          <div class="metric-card"><div class="metric-label">Bx</div><div class="metric-value ${l2Cls(l2.Bx)}" style="font-size:13px;">${(l2.Bx||0).toFixed(2)}%</div></div>
+          <div class="metric-card"><div class="metric-label">By</div><div class="metric-value ${l2Cls(l2.By)}" style="font-size:13px;">${(l2.By||0).toFixed(2)}%</div></div>
+          <div class="metric-card"><div class="metric-label">Promedio</div><div class="metric-value ${l2Cls(l2.average)}" style="font-size:13px;">${(l2.average||0).toFixed(2)}%</div></div>
+        </div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Error Cuadr&aacute;tico Medio (MSE)</div>
+        <div class="metrics-grid">
+          <div class="metric-card"><div class="metric-label">Ez</div><div class="metric-value" style="font-size:10px;color:var(--text);">${(mse.Ez||0).toExponential(3)}</div></div>
+          <div class="metric-card"><div class="metric-label">Bx</div><div class="metric-value" style="font-size:10px;color:var(--text);">${(mse.Bx||0).toExponential(3)}</div></div>
+          <div class="metric-card"><div class="metric-label">By</div><div class="metric-value" style="font-size:10px;color:var(--text);">${(mse.By||0).toExponential(3)}</div></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Energ&iacute;a</div>
+        <div class="metrics-grid">
+          <div class="metric-card"><div class="metric-label">Media</div><div class="metric-value" style="font-size:10px;color:var(--text);">${(ene.mean||0).toExponential(3)}</div></div>
+          <div class="metric-card"><div class="metric-label">Conservaci&oacute;n</div><div class="metric-value ${(ene.conservation_pct||100) < 5 ? 'error-low' : 'error-high'}" style="font-size:10px;">${(ene.conservation_pct||0).toFixed(2)}%</div></div>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--error);font-size:10px;">Error al obtener m&eacute;tricas. &iquest;Servidor activo?</div>';
+  }
+}
+
+async function fetchResiduals() {
+  if (!S.usePINN) return;
+  const container = document.getElementById('pde-residuals-container');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);font-size:11px;">Consultando...</div>';
+  try {
+    const res = await fetch(`${API}/residuals`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ t: S.t, N: 15, eps_r: S.eps_r, mu_r: S.mu_r })
+    });
+    if (!res.ok) throw new Error('Failed');
+    const data = await res.json();
+
+    const order = [
+      { key: 'faraday_x', label: 'Faraday X' },
+      { key: 'faraday_y', label: 'Faraday Y' },
+      { key: 'ampere', label: 'Amp&egrave;re' },
+      { key: 'gauss_b', label: 'Gauss B' }
+    ];
+
+    const maxVal = Math.max(...order.map(o => data[o.key] || 0), 1e-10);
+
+    container.innerHTML = `
+      <div class="pde-res-grid">
+        ${order.map(o => {
+          const val = data[o.key] || 0;
+          const pct = Math.min(100, (val / maxVal) * 100);
+          const cls = val < 1e-3 ? 'var(--success)' : (val < 1e-2 ? 'var(--warning)' : 'var(--error)');
+          return `
+            <div class="pde-res-item">
+              <div style="display:flex;justify-content:space-between;">
+                <span class="res-label">${o.label}</span>
+                <span class="res-value" style="color:${cls}">${val.toExponential(2)}</span>
+              </div>
+              <div class="pde-res-bar"><div class="pde-res-fill" style="width:${pct}%;background:${cls};"></div></div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <div style="margin-top:8px;font-size:8px;color:var(--text-muted);">
+        Total MSE: ${(data.total_mse || 0).toExponential(2)} |
+        Objetivo: &lt; 1e-3 por ecuaci&oacute;n
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--error);font-size:10px;">Error al obtener residuales.</div>';
+  }
+}
+
+async function fetchBCValidation() {
+  if (!S.usePINN) return;
+  const container = document.getElementById('bc-validation-container');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);font-size:11px;">Validando...</div>';
+  try {
+    const res = await fetch(`${API}/api/validate/boundary?N_per_side=100`);
+    if (!res.ok) throw new Error('Failed');
+    const data = await res.json();
+    const sideNames = { left: 'Izquierda (x=0)', right: 'Derecha (x=L)', bottom: 'Inferior (y=0)', top: 'Superior (y=L)' };
+    container.innerHTML = `
+      <div style="margin-bottom:8px;">
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">
+          Error Global | Media: <b style="color:${data.global_mean < 1e-3 ? 'var(--success)' : 'var(--error)'}">${data.global_mean.toExponential(2)}</b>
+          | M&aacute;x: <b style="color:${data.global_max < 1e-2 ? 'var(--success)' : 'var(--error)'}">${data.global_max.toExponential(2)}</b>
+          | Violaci&oacute;n PEC: <b style="color:${data.pec_violation_pct < 5 ? 'var(--success)' : 'var(--error)'}">${data.pec_violation_pct.toFixed(1)}%</b>
+        </div>
+      </div>
+      <div class="pde-res-grid">
+        ${Object.entries(sideNames).map(([key, label]) => {
+          const side = data.sides[key];
+          if (!side) return '';
+          const cls = side.mean < 1e-3 ? 'var(--success)' : (side.mean < 1e-2 ? 'var(--warning)' : 'var(--error)');
+          return `
+            <div class="pde-res-item">
+              <div style="display:flex;justify-content:space-between;">
+                <span class="res-label">${label}</span>
+                <span class="res-value" style="color:${cls};font-size:10px;">&mu;=${side.mean.toExponential(2)}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--text-muted);">
+                <span>m&aacute;x: ${side.max.toExponential(2)}</span>
+                <span>&sigma;: ${side.std.toExponential(2)}</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <div style="margin-top:8px;font-size:8px;color:var(--text-muted);">
+        Condici&oacute;n PEC: Ez = 0 en todas las paredes. La red debe satisfacer esta restricci&oacute;n f&iacute;sica.
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--error);font-size:10px;">Error en validaci&oacute;n de bordes.</div>';
+  }
+}
+
+let diagChartCache = null;
+
+async function fetchTrainingHistory() {
+  const panel = document.getElementById('diag-panel');
+  if (!panel || !panel.classList.contains('visible')) return;
+  try {
+    const res = await fetch(`${API}/api/training/history`);
+    if (!res.ok) throw new Error('Failed');
+    const data = await res.json();
+    diagChartCache = data;
+    renderDiagnosticCharts(data);
+    renderDiagnosticParams(data);
+  } catch (e) {
+    console.error('Diagnostics fetch failed:', e);
+  }
+}
+
+function renderDiagnosticCharts(data) {
+  const hist = data.history || [];
+  if (!hist.length) return;
+  const lossCanvas = document.getElementById('diag-loss');
+  const resCanvas = document.getElementById('diag-residual');
+  if (!lossCanvas || !resCanvas) return;
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  lossCanvas.width = lossCanvas.clientWidth * dpr * 2;
+  lossCanvas.height = lossCanvas.clientHeight * dpr;
+  resCanvas.width = resCanvas.clientWidth * dpr * 2;
+  resCanvas.height = resCanvas.clientHeight * dpr;
+  const lCtx = lossCanvas.getContext('2d');
+  const rCtx = resCanvas.getContext('2d');
+  const W = lossCanvas.width;
+  const H = lossCanvas.height;
+
+  function drawLossChart(ctx) {
+    ctx.clearRect(0, 0, W, H);
+    const epochs = hist.map(h => h.epoch);
+    const totals = hist.map(h => h.loss_total || 1e-10);
+    const pdes = hist.map(h => h.loss_pde || 1e-10);
+    const bcs = hist.map(h => h.loss_bc || 1e-10);
+    const ics = hist.map(h => h.loss_ic || 1e-10);
+    const allVals = [...totals, ...pdes, ...bcs, ...ics].filter(v => v > 0);
+    if (!allVals.length) return;
+    const yMin = Math.min(...allVals);
+    const yMax = Math.max(...allVals);
+    const padL = 35 * dpr, padR = 10 * dpr, padT = 15 * dpr, padB = 20 * dpr;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+    function xPos(e) { return padL + (e - epochs[0]) / (epochs[epochs.length-1] - epochs[0] || 1) * plotW; }
+    function yPos(v) { return padT + plotH - (Math.log10(v) - Math.log10(yMin)) / (Math.log10(yMax) - Math.log10(yMin) || 1) * plotH; }
+    ctx.strokeStyle = 'rgba(0,0,0,0.04)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 5; i++) {
+      const y = padT + plotH * (i / 5);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.font = `${8 * dpr}px monospace`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+      const t = i / 4;
+      const val = Math.pow(10, Math.log10(yMin) + t * (Math.log10(yMax) - Math.log10(yMin)));
+      ctx.fillText(val.toExponential(0), padL - 4 * dpr, padT + plotH * (1 - t));
+    }
+    function drawLine(data, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.beginPath();
+      for (let i = 0; i < data.length; i++) {
+        const x = xPos(epochs[i]), y = yPos(data[i]);
+        if (y >= padT && y <= padT + plotH) {
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+    }
+    drawLine(totals, 'rgba(26,29,35,0.8)');
+    drawLine(pdes, 'rgba(74,111,165,0.7)');
+    drawLine(bcs, 'rgba(217,74,74,0.6)');
+    drawLine(ics, 'rgba(29,158,117,0.6)');
+    ctx.font = `${7 * dpr}px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    const legendItems = [
+      { label: 'Total', color: 'rgba(26,29,35,0.8)' },
+      { label: 'PDE', color: 'rgba(74,111,165,0.7)' },
+      { label: 'BC', color: 'rgba(217,74,74,0.6)' },
+      { label: 'IC', color: 'rgba(29,158,117,0.6)' }
+    ];
+    const legX = padL + 5 * dpr;
+    const legY = padT + 5 * dpr;
+    legendItems.forEach((item, i) => {
+      const lx = legX + (i % 2) * 65 * dpr;
+      const ly = legY + Math.floor(i / 2) * 12 * dpr;
+      ctx.fillStyle = item.color;
+      ctx.fillRect(lx, ly, 8 * dpr, 8 * dpr);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillText(item.label, lx + 10 * dpr, ly);
+    });
+  }
+
+  function drawResidualChart(ctx) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = `${9 * dpr}px sans-serif`;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('&Eacute;pocas vs P&eacute;rdida (escala log)', W/2, H/2);
+  }
+
+  drawLossChart(lCtx);
+  drawResidualChart(rCtx);
+}
+
+function renderDiagnosticParams(data) {
+  const el = document.getElementById('diag-params');
+  if (!el) return;
+  const p = data.params || {};
+  el.innerHTML = `
+    <div style="margin-bottom:6px;"><b style="color:var(--accent);">Arquitectura</b></div>
+    <div>FCN ${p.arch || '[3,128,128,128,128,3]'}</div>
+    <div style="margin-top:4px;">Par&aacute;metros: <b>${(p.n_params || 58243).toLocaleString()}</b></div>
+    <div style="margin-top:4px;">Fourier: ${p.fourier ? '✅' : '❌'} (N=${p.n_fourier||32}, &sigma;=${p.sigma||1.5})</div>
+    <div style="margin-top:4px;">Optimizaci&oacute;n: Adam → L-BFGS</div>
+    <div style="margin-top:4px;">Warm-up: 8000 &eacute;pocas (&lambda;=100)</div>
+    <div style="margin-top:4px;">LR: CosineAnnealingWarmRestarts</div>
+  `;
+}
+
+let diagToggleInterval = null;
+
+function initDiagnostics() {
+  const btn = document.createElement('button');
+  btn.id = 'diag-toggle-btn';
+  btn.textContent = '📈 Diagn&oacute;stico';
+  document.body.appendChild(btn);
+
+  const panel = document.getElementById('diag-panel');
+
+  btn.onclick = () => {
+    panel.classList.toggle('visible');
+    btn.textContent = panel.classList.contains('visible') ? '✕ Cerrar' : '📈 Diagn&oacute;stico';
+    if (panel.classList.contains('visible')) {
+      fetchTrainingHistory();
+      if (diagToggleInterval) clearInterval(diagToggleInterval);
+      diagToggleInterval = setInterval(fetchTrainingHistory, 5000);
+    } else {
+      if (diagToggleInterval) { clearInterval(diagToggleInterval); diagToggleInterval = null; }
+    }
+  };
+}
+
+async function runBenchmark() {
+  const status = document.getElementById('export-status');
+  status.textContent = 'Ejecutando benchmark...';
+  try {
+    const res = await fetch(`${API}/api/benchmark`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ N: 40 })
+    });
+    if (!res.ok) throw new Error('Failed');
+    const data = await res.json();
+    const bench = data.benchmark || [];
+    let report = 'PINN Benchmark\n-------------\n';
+    bench.forEach(b => {
+      report += `\nBatch ${b.batch_size}: ${b.pinn_time_ms.toFixed(2)}ms (${b.pinn_pts_per_sec.toLocaleString()} pts/s)\n`;
+      report += `  vs FDTD 50×50: ~${(b.fdtd_comparison?.['50x50']?.time_per_step_ms || 0).toFixed(1)}ms/step\n`;
+    });
+    console.log(report);
+    status.textContent = '✅ Benchmark completado (ver consola)';
+  } catch (e) {
+    status.textContent = 'Error en benchmark';
+  }
+  setTimeout(() => { if (status) status.textContent = ''; }, 3000);
+}
+
+function initSimulationModes() {
+  const modeSelect = document.getElementById('sim-mode');
+  const modelSelect = document.getElementById('model-selector');
+
+  modeSelect.onchange = () => {
+    const mode = modeSelect.value;
+    const statusEl = document.getElementById('export-status');
+    if (statusEl) statusEl.textContent = `Modo: ${modeSelect.options[modeSelect.selectedIndex].text}`;
+  };
+
+  modelSelect.onchange = () => {
+    const model = modelSelect.value;
+    if (model === 'comparison') {
+      const panel = document.getElementById('compare-panel');
+      const btn = document.getElementById('compare-toggle-btn');
+      if (panel && btn) {
+        panel.classList.add('visible');
+        btn.classList.add('active');
+        btn.textContent = '✕ Cerrar';
+      }
+      fetchComparison();
+    } else if (model === 'pinn') {
+      S.usePINN = true;
+      updateBadge();
+    } else if (model === 'analytical') {
+      S.usePINN = false;
+      updateBadge();
+    } else {
+      checkAPI();
+    }
+  };
+
+  modeSelect.dispatchEvent(new Event('change'));
+}
+
+function initExport() {
+  const pngBtn = document.getElementById('export-png');
+  const csvBtn = document.getElementById('export-csv');
+  const jsonBtn = document.getElementById('export-json');
+  const configBtn = document.getElementById('export-config');
+  const benchBtn = document.getElementById('btn-benchmark');
+  if (pngBtn) pngBtn.onclick = exportPNG;
+  if (csvBtn) csvBtn.onclick = () => exportData('csv');
+  if (jsonBtn) jsonBtn.onclick = () => exportData('json');
+  if (configBtn) configBtn.onclick = exportConfig;
+  if (benchBtn) benchBtn.onclick = runBenchmark;
+}
+
+async function exportPNG() {
+  const status = document.getElementById('export-status');
+  status.textContent = 'Capturando...';
+  const canvas = document.getElementById('c');
+  if (!canvas) { status.textContent = 'Error: canvas no encontrado'; return; }
+  const link = document.createElement('a');
+  link.download = `maxwell_pinn_${S.t.toFixed(2)}s.png`;
+  try {
+    const dataUrl = canvas.toDataURL('image/png');
+    link.href = dataUrl;
+    link.click();
+    status.textContent = '✅ PNG exportado';
+  } catch (e) {
+    status.textContent = 'Error al exportar PNG';
+  }
+  setTimeout(() => { if (status) status.textContent = ''; }, 3000);
+}
+
+async function exportData(format) {
+  const status = document.getElementById('export-status');
+  status.textContent = `Exportando ${format.toUpperCase()}...`;
+  try {
+    const res = await fetch(`${API}/api/export/field`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ format: format, t: S.t, N: 50, eps_r: S.eps_r, mu_r: S.mu_r })
+    });
+    if (!res.ok) throw new Error('Export failed');
+    if (format === 'csv') {
+      const blob = await res.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `maxwell_fields_t${S.t.toFixed(3)}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } else {
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `maxwell_fields_t${S.t.toFixed(3)}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+    status.textContent = `✅ ${format.toUpperCase()} exportado`;
+  } catch (e) {
+    status.textContent = `Error exportando ${format}`;
+  }
+  setTimeout(() => { if (status) status.textContent = ''; }, 3000);
+}
+
+async function exportConfig() {
+  const status = document.getElementById('export-status');
+  status.textContent = 'Exportando config...';
+  try {
+    const res = await fetch(`${API}/api/export/config`);
+    const data = await res.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'maxwell_config.json';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    status.textContent = '✅ Config exportada';
+  } catch (e) {
+    status.textContent = 'Error exportando config';
+  }
+  setTimeout(() => { if (status) status.textContent = ''; }, 3000);
+}
+
+const originalUpdateData = updateData;
+updateData = function() {
+  originalUpdateData();
+  const comparePanel = document.getElementById('compare-panel');
+  if (comparePanel && comparePanel.classList.contains('visible')) {
+    const activeTab = document.querySelector('#compare-panel .compare-tab.active');
+    if (activeTab) {
+      const tabId = activeTab.dataset.ctab;
+      if (tabId === 'ctab-fields') fetchComparison();
+    }
+  }
+};
+
+initComparisonPanel();
+initDiagnostics();
+initSimulationModes();
+initExport();
+
 checkAPI();
 animate();
 </script>
