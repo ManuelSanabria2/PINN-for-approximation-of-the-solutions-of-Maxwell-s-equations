@@ -1,6 +1,5 @@
 ---
 title: Maxwell PINN Faraday Digital
-emoji: ⚡
 colorFrom: blue
 colorTo: purple
 sdk: docker
