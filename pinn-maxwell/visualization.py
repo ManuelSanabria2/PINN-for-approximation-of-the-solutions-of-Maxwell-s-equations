@@ -16,10 +16,12 @@ def get_model_device(model):
     return next(model.parameters()).device
 
 def calc_l2_error(pred, exact):
-    """Calcula la métrica escalar relativa Norma L2 para títulos gráficos."""
     pred_vec = pred.flatten()
     exact_vec = exact.flatten()
-    return np.linalg.norm(pred_vec - exact_vec, 2) / np.linalg.norm(exact_vec, 2)
+    denom = np.linalg.norm(exact_vec, 2)
+    if denom < 1e-15:
+        return float(np.linalg.norm(pred_vec - exact_vec, 2))
+    return np.linalg.norm(pred_vec - exact_vec, 2) / denom
 
 def plot_fields_snapshot(model, t_val, N=100, save_path='results/'):
     """

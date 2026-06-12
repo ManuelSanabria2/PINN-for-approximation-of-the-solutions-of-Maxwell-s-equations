@@ -62,7 +62,10 @@ def train_adam(model, n_epochs=20000, lr=1e-3,
     history = []
 
     # Warm-up curricular: pesos BC e IC altos al inicio para anclar las condiciones físicas
-    WARMUP_END = 8000
+    # Escala con n_epochs para que runs cortos (--quick, sensitivity) también
+    # atraviesen la fase post-warmup y usen los lambda_bc/lambda_ic del usuario.
+    WARMUP_END = min(8000, n_epochs // 2) if n_epochs >= 20 else 0
+    WARMUP_END = max(WARMUP_END, 0)
     lambda_bc_warmup = 100.0
     lambda_ic_warmup = 100.0
 

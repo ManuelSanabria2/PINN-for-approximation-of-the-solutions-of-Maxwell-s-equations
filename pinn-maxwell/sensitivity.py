@@ -22,7 +22,7 @@ def sensitivity_architecture(architectures, adam_epochs=5000, device='cpu'):
     results = []
     
     for arch in architectures:
-        model = FCN(arch).to(device)
+        model = FCN(arch, fourier_features=True, n_fourier=32, sigma=1.5).to(device)
         n_params = count_parameters(model)
         
         start_t = time.time()
@@ -53,7 +53,7 @@ def sensitivity_collocation(N_col_list=[500, 1000, 2000, 5000, 10000], adam_epoc
     base_arch = [3, 128, 128, 128, 128, 3]
     
     for ncol in N_col_list:
-        model = FCN(base_arch).to(device)
+        model = FCN(base_arch, fourier_features=True, n_fourier=32, sigma=1.5).to(device)
         model, _ = train_adam(model, n_epochs=adam_epochs, N_col=ncol, device=device, verbose_every=999999)
         
         l2_errs = l2_error_per_field(model)
@@ -79,7 +79,7 @@ def sensitivity_lambdas(lambda_configs, adam_epochs=5000, device='cpu'):
     base_arch = [3, 128, 128, 128, 128, 3]
     
     for cfg in lambda_configs:
-        model = FCN(base_arch).to(device)
+        model = FCN(base_arch, fourier_features=True, n_fourier=32, sigma=1.5).to(device)
         
         model, hist = train_adam(
             model, n_epochs=adam_epochs, device=device, verbose_every=999999,

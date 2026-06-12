@@ -480,12 +480,26 @@ def api_compare_metrics(r: CompareReq):
     r_amp = (ag(Ez, t) - ag(By, x) + ag(Bx, y)).detach().cpu().numpy()
     r_gauss = (ag(Bx, x) + ag(By, y)).detach().cpu().numpy()
 
-    # Energy conservation
+    # Energy conservation — integración temporal multi-paso
+    # Conservación verdadera: U(t) = ∬ u(x,y,t) dx dy debe ser constante.
+    # Medimos (U_max - U_min) / U_mean a lo largo del tiempo, no dispersión espacial.
     eps_r_val = max(float(r.eps_r), 1e-9)
     mu_r_val = max(float(r.mu_r), 1e-9)
-    u = 0.5 * eps0 * eps_r_val * (Ez_p ** 2) + (0.5 / (mu0 * mu_r_val)) * (Bx_p ** 2 + By_p ** 2)
-    U_mean = float(np.mean(u))
-    U_std = float(np.std(u))
+    Nt = 20
+    t_energy = np.linspace(0.0, T_MAX, Nt, dtype=np.float32)
+    x_2d = np.linspace(0.05, 0.95, 30, dtype=np.float32)
+    dx = x_2d[1] - x_2d[0]
+    Xg2, Yg2 = np.meshgrid(x_2d, x_2d)
+    xf2 = Xg2.flatten(); yf2 = Yg2.flatten()
+    U_arr = []
+    for t_val in t_energy:
+        tf2 = np.full_like(xf2, t_val)
+        Ez_t, Bx_t, By_t = _infer(xf2, yf2, tf2)
+        u_t = 0.5 * eps0 * eps_r_val * (Ez_t ** 2) + (0.5 / (mu0 * mu_r_val)) * (Bx_t ** 2 + By_t ** 2)
+        U_arr.append(np.sum(u_t) * dx * dx)
+    U_arr = np.array(U_arr)
+    U_mean_t = float(np.mean(U_arr))
+    conservation_pct = float((np.max(U_arr) - np.min(U_arr)) / U_mean_t * 100.0) if U_mean_t > 1e-12 else 0.0
 
     return {
         "l2": {
@@ -507,9 +521,9 @@ def api_compare_metrics(r: CompareReq):
             "total_mse": float(np.mean(r_fx**2 + r_fy**2 + r_amp**2 + r_gauss**2))
         },
         "energy": {
-            "mean": U_mean,
-            "std": U_std,
-            "conservation_pct": float((U_std / U_mean) * 100.0) if U_mean > 1e-12 else 0.0
+            "mean": U_mean_t,
+            "n_steps": Nt,
+            "conservation_pct": conservation_pct
         }
     }
 
@@ -589,6 +603,7 @@ def api_validate_boundary(N_per_side: int = 100):
         raise HTTPException(status_code=503, detail="PINN model is not loaded")
 
     sides = {}
+    all_pts_list = []
     for side_name, x_fixed, y_fixed in [
         ('left', 0.0, None), ('right', L, None),
         ('bottom', None, 0.0), ('top', None, L)
@@ -598,29 +613,28 @@ def api_validate_boundary(N_per_side: int = 100):
 
         if x_fixed is None:
             xs = np.random.uniform(0, L, N_per_side).astype(np.float32)
-            xs[0] = 0.0 if side_name == 'left' else L
         if y_fixed is None:
             ys = np.random.uniform(0, L, N_per_side).astype(np.float32)
-            ys[0] = 0.0 if side_name == 'bottom' else L
 
         ts = np.random.uniform(0, T_MAX, N_per_side).astype(np.float32)
 
         Ez, _, _ = _infer(xs, ys, ts)
+        abs_err = np.abs(Ez)
+        all_pts_list.append(abs_err)
 
         side_errors = {
-            'mean': float(np.mean(np.abs(Ez))),
-            'max': float(np.max(np.abs(Ez))),
-            'std': float(np.std(np.abs(Ez)))
+            'mean': float(np.mean(abs_err)),
+            'max': float(np.max(abs_err)),
+            'std': float(np.std(abs_err))
         }
         sides[side_name] = side_errors
 
-    # Global boundary error
-    all_errs = np.concatenate([np.array([s['mean']]) for s in sides.values()])
+    all_pts = np.concatenate(all_pts_list)
     return {
         "sides": sides,
-        "global_mean": float(np.mean(all_errs)),
-        "global_max": max(s['max'] for s in sides.values()),
-        "pec_violation_pct": float(np.sum(all_errs > 1e-3) / len(all_errs) * 100.0)
+        "global_mean": float(np.mean(all_pts)),
+        "global_max": float(np.max(all_pts)),
+        "pec_violation_pct": float(np.mean(all_pts > 1e-3) * 100.0)
     }
 
 

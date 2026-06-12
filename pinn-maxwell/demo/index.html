@@ -106,7 +106,7 @@
 
     <!-- Validation (collapsible) -->
     <div class="fold-section">
-      <div class="fold-header" id="fold-toggle" onclick="this.parentElement.classList.toggle('expanded')">
+      <div class="fold-header" id="fold-toggle" onclick="toggleValidationFold(this)">
         <span class="fold-arrow">&#9654;</span>
         <span class="eyebrow" style="display:inline;font-size:9px;">Validaci&oacute;n PINN vs Anal&iacute;tica</span>
         <span class="fold-count" id="fold-count"></span>
@@ -354,7 +354,7 @@ const S = {
   showGhost: true, showVec: true, showBox: true, showStream: true, showContours: true,
   usePINN: false, sliceData: null, gridData: null, residualMap: null,
   fetchPending: false, gridPending: false, resPending: false,
-  lastFetch: 0, lastGrid: 0, lastResidual: 0, residualHistory: []
+  lastFetch: 0, fetchDirty: false, lastGrid: 0, lastResidual: 0, residualHistory: []
 };
 
 const infernoMap = [[0,0,4],[40,11,84],[101,21,110],[159,42,99],[212,72,66],[245,125,21],[252,187,54],[252,255,164]];
@@ -539,7 +539,8 @@ function updateBadge() {
 async function updateData() {
   const now = performance.now();
 
-  if (!S.fetchPending && now - S.lastFetch > 80) {
+  if (S.fetchDirty || (!S.fetchPending && now - S.lastFetch > 80)) {
+    S.fetchDirty = false;
     S.fetchPending = true;
     const payload = {
       t: S.t, N: S.resolution, axis: S.axis, position: S.position,
@@ -646,13 +647,16 @@ function updateStreamlines(dt) {
 
 function analyticalSlice(N, axis, pos, t) {
   const Ez = [], Bx = [], By = [];
+  const tWin = T_MAX / 2;
+  const t0 = Math.max(0, t - tWin / 2);
+  const t1 = Math.min(T_MAX, t + tWin / 2);
   for (let j = 0; j < N; j++) {
     const rE = [], rX = [], rY = [];
     for (let i = 0; i < N; i++) {
       let x, y, tt = t;
       if (axis === 'xy') { x = i/(N-1); y = j/(N-1); }
-      else if (axis === 'xz') { x = i/(N-1); y = pos; tt = (j/(N-1))*T_MAX; }
-      else { x = pos; y = j/(N-1); tt = (i/(N-1))*T_MAX; }
+      else if (axis === 'xz') { x = i/(N-1); y = pos; tt = t0 + (j/(N-1)) * (t1 - t0); }
+      else { x = pos; y = j/(N-1); tt = t0 + (i/(N-1)) * (t1 - t0); }
       const f = fieldAt(x, y, tt);
       rE.push(f.Ez); rX.push(f.Bx); rY.push(f.By);
     }
@@ -767,14 +771,14 @@ function animate() {
 }
 
 document.getElementById('btn-play').onclick = e => { S.playing = !S.playing; e.target.textContent = S.playing ? 'Pausar Simulaci&oacute;n' : 'Reanudar'; };
-document.getElementById('sl-t').oninput = e => { S.t = parseFloat(e.target.value); document.getElementById('v-t').textContent = S.t.toFixed(3) + ' s'; };
+document.getElementById('sl-t').oninput = e => { S.t = parseFloat(e.target.value); document.getElementById('v-t').textContent = S.t.toFixed(3) + ' s'; S.fetchDirty = true; };
 document.getElementById('sl-sp').oninput = e => { S.speed = parseFloat(e.target.value); document.getElementById('v-sp').textContent = S.speed.toFixed(1) + 'x'; };
 document.getElementById('sl-eps').oninput = e => { S.eps_r = parseFloat(e.target.value); document.getElementById('v-eps').textContent = S.eps_r.toFixed(2); };
 document.getElementById('sl-mu').oninput = e => { S.mu_r = parseFloat(e.target.value); document.getElementById('v-mu').textContent = S.mu_r.toFixed(2); };
 document.getElementById('sl-freq').oninput = e => { S.freq_scale = parseFloat(e.target.value); document.getElementById('v-freq').textContent = S.freq_scale.toFixed(2) + 'x'; };
 document.getElementById('sl-sigma').oninput = e => { S.sigma_wall = parseFloat(e.target.value); document.getElementById('v-sigma').textContent = S.sigma_wall.toFixed(2); };
-document.getElementById('sl-res').oninput = e => { S.resolution = parseInt(e.target.value); document.getElementById('v-res').textContent = S.resolution; };
-document.getElementById('sl-pos').oninput = e => { S.position = parseFloat(e.target.value); document.getElementById('v-pos').textContent = S.position.toFixed(2); };
+document.getElementById('sl-res').oninput = e => { S.resolution = parseInt(e.target.value); document.getElementById('v-res').textContent = S.resolution; S.fetchDirty = true; };
+document.getElementById('sl-pos').oninput = e => { S.position = parseFloat(e.target.value); document.getElementById('v-pos').textContent = S.position.toFixed(2); S.fetchDirty = true; };
 document.getElementById('field-mode').onchange = e => { S.fieldMode = e.target.value; applySlice(); };
 
 function bindToggle(id, key, callback) {
@@ -798,6 +802,7 @@ document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => {
   b.classList.add('active');
   S.axis = b.dataset.axis;
   document.getElementById('pos-wrap').style.display = S.axis === 'xy' ? 'none' : 'block';
+  S.fetchDirty = true; updateData();
 });
 
 const heroPanel = document.getElementById('hero-panel');
@@ -849,6 +854,15 @@ function initComparisonPanel() {
       else if (tabId === 'ctab-bc') fetchBCValidation();
     };
   });
+}
+
+function toggleValidationFold(el) {
+  const section = el.parentElement;
+  const wasExpanded = section.classList.contains('expanded');
+  section.classList.toggle('expanded');
+  if (!wasExpanded && section.classList.contains('expanded')) {
+    fetchComparison();
+  }
 }
 
 async function fetchComparison() {
@@ -1427,6 +1441,10 @@ updateData = function() {
       const tabId = activeTab.dataset.ctab;
       if (tabId === 'ctab-fields') fetchComparison();
     }
+  }
+  const foldSection = document.querySelector('.fold-section');
+  if (foldSection && foldSection.classList.contains('expanded')) {
+    fetchComparison();
   }
 };
 

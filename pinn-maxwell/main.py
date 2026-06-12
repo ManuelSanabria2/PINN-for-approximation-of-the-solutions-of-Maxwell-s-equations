@@ -129,7 +129,7 @@ def run_evaluation(device, model=None):
 
 def main():
     parser = argparse.ArgumentParser(description="""\
-        P.I.N.N. Solver ⚡ - Simulador Cuántico Electromagnético
+        P.I.N.N. Solver  - Simulador Cuántico Electromagnético
         Resuelve las Ecuaciones de Maxwell (Modo TM_11 Rectangular PEC)
         Arquitectura: FCN con Fourier Feature Encoding + Adam→L-BFGS
     """, formatter_class=argparse.RawDescriptionHelpFormatter)

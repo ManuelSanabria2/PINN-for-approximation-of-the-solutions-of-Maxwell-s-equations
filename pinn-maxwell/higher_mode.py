@@ -103,17 +103,18 @@ def compare_predictions(model_11, model_21, t_val, N=100, save_path='results/'):
     """
     os.makedirs(save_path, exist_ok=True)
     
+    device = next(model_11.parameters()).device
     x_lin = np.linspace(0, L, N)
     y_lin = np.linspace(0, L, N)
     X, Y = np.meshgrid(x_lin, y_lin, indexing='ij')
     
-    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1)
-    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1)
-    t_t = torch.tensor(np.full_like(X.flatten(), t_val), dtype=torch.float32).unsqueeze(1)
+    x_t = torch.tensor(X.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    y_t = torch.tensor(Y.flatten(), dtype=torch.float32).unsqueeze(1).to(device)
+    t_t = torch.tensor(np.full_like(X.flatten(), t_val), dtype=torch.float32).unsqueeze(1).to(device)
     
     with torch.no_grad():
-        preds_11 = model_11(x_t, y_t, t_t)
-        preds_21 = model_21(x_t, y_t, t_t)
+        preds_11 = [p.cpu() for p in model_11(x_t, y_t, t_t)]
+        preds_21 = [p.cpu() for p in model_21(x_t, y_t, t_t)]
     
     fig, axes = plt.subplots(3, 2, figsize=(12, 14), dpi=150)
     fig.suptitle(f"Disección Modal Estructural | t = {t_val:.2e}s | TM11 vs TM21", fontsize=16)
