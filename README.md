@@ -7,198 +7,171 @@ app_port: 7860
 pinned: false
 ---
 
-#  PINN para Ecuaciones de Maxwell — Cámara de Faraday Digital
+# Fluxia — PINN vs FDTD para las Ecuaciones de Maxwell
 
-> **Red Neuronal Informada por la Física (PINN)** que aproxima la solución analítica exacta de las Ecuaciones de Maxwell en una cavidad rectangular PEC 2D, con demo interactiva 3D en tiempo real.
+> Entorno profesional de simulación electromagnética (estilo CAD) que resuelve las **Ecuaciones de Maxwell 2D TM** con dos métodos — una **Red Neuronal Informada por la Física (PINN)** y un **solver FDTD (esquema de Yee)** — y los compara célula a célula, en la misma malla y los mismos instantes de tiempo.
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.x-orange?logo=pytorch)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.11x-green?logo=fastapi)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.1xx-green?logo=fastapi)
 ![Three.js](https://img.shields.io/badge/Three.js-r165-black?logo=threedotjs)
-![Error L2](https://img.shields.io/badge/Error%20L2-<2%25-brightgreen)
+![Error L2](https://img.shields.io/badge/PINN%20vs%20FDTD-L2%20%3D%200.12%25-brightgreen)
 
 ---
 
-##  ¿Qué resuelve este proyecto?
+## ¿Qué es?
 
-La PINN aprende a resolver las **Ecuaciones de Maxwell** en modo TM₁₁ para una cavidad rectangular con condiciones de contorno PEC (Perfect Electric Conductor):
+La mayoría de las herramientas permiten ejecutar distintos solvers; **muy pocas están diseñadas para evaluar directamente cómo una PINN reproduce una solución FDTD**. Fluxia hace exactamente eso:
 
-$$\frac{\partial E_z}{\partial t} = \frac{1}{\mu_0}\left(\frac{\partial B_x}{\partial y} - \frac{\partial B_y}{\partial x}\right) \quad \text{(Ampere)}$$
+- **PINN** (`model.py`, `physics.py`): red FCN `(x,y,t) → (Ez,Bx,By)` con Fourier Feature Encoding, entrenada minimizando los residuales de Maxwell + condiciones PEC + condición inicial TM₁₁.
+- **FDTD** (`fdtd.py`): solver Yee 2D TM de orden 2, condición CFL, materiales heterogéneos (ε_r, μ_r, σ), PEC, PML graduada, fuentes de pulso gaussiano y conservación de energía verificada.
+- **Comparación** (`comparison.py`): el PINN se evalúa en la malla y los tiempos exactos del FDTD → error L2 / RMS / máximo, mapas de error, series temporales, tiempos de cómputo, memoria e iteraciones.
 
-$$\frac{\partial B_x}{\partial t} = -\frac{\partial E_z}{\partial y}, \quad \frac{\partial B_y}{\partial t} = \frac{\partial E_z}{\partial x} \quad \text{(Faraday)}$$
+### Problema físico
 
-**Sin malla. Sin diferencias finitas. Una red neuronal aprende la ley física.**
+Modo TM en una cavidad PEC `[0,L]²` (unidades naturales, c = ε₀ = μ₀ = 1):
+
+$$\frac{\partial B_x}{\partial t} = -\frac{\partial E_z}{\partial y}, \qquad \frac{\partial B_y}{\partial t} = \frac{\partial E_z}{\partial x} \quad \text{(Faraday)}$$
+
+$$\varepsilon\frac{\partial E_z}{\partial t} = \frac{\partial B_y}{\partial x} - \frac{\partial B_x}{\partial y} - \sigma E_z \quad \text{(Ampère–Maxwell)}$$
+
+Condición inicial (modo TM₁₁): `Ez = E₀·sin(πx/L)·sin(πy/L)`, `B = 0`. Existe solución analítica exacta (`analytical.py`), usada para validar ambos solvers de forma independiente.
 
 ---
 
-##  Resultados
+## Resultados verificados
 
-| Métrica | Antes | Después |
+**PINN vs FDTD** (malla 101×101, 566 pasos, 2 periodos TM₁₁, todo el tensor espacio-temporal):
+
+| Métrica | Valor |
+|---|---|
+| Error L2 (Ez) | **0.118 %** |
+| Error RMS (Ez) | **0.118 %** |
+| Error máximo (Ez) | **1.24 %** |
+| Error L2 (Bx / By) | 1.12 % / 1.12 % |
+| PINN | 58 243 parámetros · 12 000 épocas · 0.2 MB |
+| FDTD | 566 pasos · 0.8 MB |
+
+**FDTD vs solución analítica** (convergencia de orden 2 y conservación de energía):
+
+| Malla | Error L2 medio | Deriva de energía |
 |---|---|---|
-| Error L2 Ez | ~64% | **< 2%** |
-| Error L2 Bx | ~63% | **< 2%** |
-| Error L2 By | ~63% | **< 2%** |
-| Conservación Energía | ~320% | **< 5%** |
+| 51×51 | 0.216 % | 0.000 % |
+| 101×101 | 0.058 % | 0.000 % |
+| 201×201 | 0.011 % | 0.000 % |
 
 ---
 
-##  Demo Interactiva — Cámara de Faraday Digital
-
-Una visualización 3D inmersiva donde el usuario interroga al modelo en tiempo real.
-
-### Inicio Rápido
+## Inicio rápido
 
 ```bash
-# 1. Clonar el repositorio
 git clone https://github.com/ManuelSanabria2/PINN-for-approximation-of-the-solutions-of-Maxwell-s-equations.git
 cd PINN-for-approximation-of-the-solutions-of-Maxwell-s-equations
+pip install -r requirements.txt
 
-# 2. Instalar dependencias
-pip install torch numpy matplotlib scipy fastapi uvicorn
-
-# 3. Levantar el servidor de la demo
 cd pinn-maxwell
 uvicorn server:app --port 8000
-
-# 4. Abrir en el navegador
-# http://localhost:8000/demo
+# → http://localhost:8000/demo
 ```
 
-### Controles de la Demo
+En Windows basta con doble clic en `start_demo.bat`.
 
-| Control | Acción |
+**Prueba en 30 segundos:** menú **Simulación → Ejecutar ambos (F7)** → la pestaña *Comparación PINN vs FDTD* muestra 4 paneles sincronizados (PINN | FDTD | mapa de error | métricas) que se mueven juntos con el slider temporal.
+
+---
+
+## La interfaz
+
+```
+┌────────────────────────── Menús ──────────────────────────────┐
+│ Archivo · Simulación · Herramientas · Visualización · Ayuda   │
+├───────────┬──────────────────────────────────┬────────────────┤
+│ Explorador│  Vista 3D  /  Comparación 2×2    │  Propiedades   │
+│ (árbol    │  rotar·zoom·pan·selección·medir  │  contextuales  │
+│  CAD)     │  ⏮ ◀ ▶ ⏸ ⏭  slider  0.25×–10×   │                │
+├───────────┴──────────────────────────────────┴────────────────┤
+│ Consola · Entrenamiento PINN (en vivo) · Gráficas             │
+└───────────────────────────────────────────────────────────────┘
+```
+
+| Componente | Detalle |
 |---|---|
-| **Arrastrar** | Rotar la cámara 3D |
-| **Scroll** | Zoom |
-| `Space` | Play / Pause |
-| **Slider ε_r** | Cambiar permitividad → la onda se contrae |
-| **Slider μ_r** | Cambiar permeabilidad → la onda se expande |
-| **XY / XT / YT** | Cambiar modo de corte (espacial / espacio-temporal) |
-| **Malla Fantasma** | Ver puntos de colocación del entrenamiento |
-
-> **Modo offline:** Si el servidor no está activo, la demo usa automáticamente la solución analítica exacta calculada en el navegador.
-
----
-
-##  Arquitectura de la Red
-
-```
-Entrada: (x, y, t) ∈ [0,1]×[0,1]×[0,T]
-     ↓
-Fourier Feature Encoding (σ = 1.5, N = 32 frecuencias)
-     ↓
-4 capas ocultas × 128 neuronas (Tanh)
-     ↓
-Salida: (Ez, Bx, By) — los 3 campos electromagnéticos
-```
-
-### Técnicas para Convergencia
-
-| Técnica | Descripción |
-|---|---|
-| **Fourier Feature Encoding** | Supera el sesgo espectral — permite aprender funciones de alta frecuencia como sin(πx)·sin(πy)·cos(ωt) |
-| **Warm-up Curricular** | λ_BC/IC = 100 durante las primeras 8k épocas para anclar las condiciones físicas |
-| **Cosine Annealing** | Scheduler de LR con reinicios calientes (T₀=4000, T_mult=2) |
-| **Gradient Clipping** | Previene explosión de gradientes durante Adam |
-| **L-BFGS** | Refinamiento fino post-Adam (5000 iteraciones) |
-| **λ_Gauss = 2×** | Peso doble para la restricción ∇·B = 0 |
-| **Resampling BC/IC** | Puntos de frontera re-muestreados cada 3000 épocas |
+| **Explorador del proyecto** | Geometría (caja, esfera, antena) · Materiales (aire, PEC, silicio) · Fuentes (modo TM₁₁, pulso gaussiano) · Monitores · Solver PINN · Solver FDTD · Resultados. Ojo ◉ para mostrar/ocultar. |
+| **Vista 3D** (Three.js) | Dominio transparente, malla, materiales coloreados, fuente como flecha roja, PML, campo como superficie desplazada, isolíneas, cortes XY/XZ/YZ, ejes, medición de distancias. |
+| **Propiedades** | Material: ε_r, μ_r, σ, color, modelo dispersivo · Fuente: tipo, frecuencia, potencia, τ, polarización · Dominio: Nx, Ny, Δx, Δy, Courant, T máx. |
+| **Comparación 2×2** | PINN \| FDTD \| error (absoluto/relativo, escala auto/global) \| métricas — sincronizados por un slider temporal. |
+| **Entrenamiento PINN** | Época, Loss PDE/BC/IC, learning rate y tiempo con gráficas log **en vivo** (WebSocket), estilo TensorBoard. Reentrenable desde la UI. |
+| **Gráficas** | Ez(t) en sonda · Espectro FFT (pico en f = ω/2π ≈ 0.707) · Energía U(t) · Error vs tiempo · Residuales PDE vía autograd. |
+| **Consola** | Streaming en vivo del backend: compilación de geometría, generación de malla, pasos FDTD, épocas de entrenamiento, errores. |
+| **Herramientas** | Generador de malla (puntos por λ) · Refinamiento adaptativo (extrapolación de Richardson) · Inspector de materiales · Configuración GPU/hilos. |
+| **Exportación** | PDF técnico · CSV · NumPy (.npz) · HDF5 · VTK (ParaView) · MATLAB (.mat) · PNG · GIF · video WebM del viewport · STL de geometrías. |
 
 ---
 
-##  Estructura del Proyecto
+## Estructura del proyecto
 
 ```
- PINN-Maxwell/
-├──  pinn-maxwell/
-│   ├── main.py          # Punto de entrada — pipeline completo
-│   ├── model.py         # Arquitectura FCN con Fourier Features
-│   ├── train.py         # Entrenamiento Adam + L-BFGS
-│   ├── physics.py       # Residuales de Maxwell + función de pérdida
-│   ├── sampling.py      # Muestreo de puntos de colocación
-│   ├── analytical.py    # Solución analítica exacta TM₁₁
-│   ├── metrics.py       # Evaluación L2, energía, BC, IC (GPU-compatible)
-│   ├── visualization.py # Gráficas científicas (GPU-compatible)
-│   ├── server.py        # FastAPI backend para la demo 3D
-│   ├── higher_mode.py   # Modo experimental TM₂₁
-│   ├── sensitivity.py   # Análisis de sensibilidad de hiperparámetros
-│   └──  demo/
-│       ├── index.html   #  Cámara de Faraday Digital (Three.js)
-│       └── README.md    # Instrucciones de la demo
-├──  results/
-│   ├── maxwell_pinn.pth # Modelo entrenado
-│   └── training_log.txt # Log de entrenamiento
-└── README.md            # Este archivo
+pinn-maxwell/
+├── fdtd.py          # Solver FDTD Yee 2D TM (materiales, PML, fuentes, energía)
+├── comparison.py    # Comparación PINN vs FDTD en la misma malla/tiempos
+├── exporters.py     # CSV, VTK, MATLAB, NumPy, HDF5, PNG, GIF, PDF, STL
+├── server.py        # Backend FastAPI: jobs, WebSocket, entrenamiento en vivo, export
+├── model.py         # FCN + Fourier Feature Encoding
+├── physics.py       # Residuales de Maxwell + función de pérdida PINN
+├── train.py         # Entrenamiento Adam + L-BFGS
+├── sampling.py      # Muestreo de colocación / frontera / inicial
+├── analytical.py    # Solución analítica exacta TM_mn
+├── main.py          # Pipeline CLI de entrenamiento/evaluación
+└── demo/            # Frontend Fluxia (sin frameworks)
+    ├── index.html   #   Layout CAD: menús, árbol, viewport, propiedades, dock
+    ├── style.css    #   Tema oscuro de ingeniería
+    └── js/
+        ├── app.js       # Arranque y orquestación
+        ├── api.js       # Cliente REST + WebSocket
+        ├── state.js     # Estado central (proyecto, selección, frames)
+        ├── viewport.js  # Escena 3D (Three.js)
+        ├── ui.js        # Árbol, propiedades, consola, menús
+        ├── panels.js    # Entrenamiento, comparación 2×2, gráficas, reproductor
+        └── charts.js    # Gráficas de línea + heatmaps + FFT (canvas puro)
 ```
 
----
+## API principal
 
-##  Entrenamiento desde Cero
+```
+POST /api/run                {mode: pinn|fdtd|both, project}   → job en segundo plano
+GET  /api/jobs/{id}                                            → estado
+GET  /api/results/{id}/meta                                    → métricas, series, tiempos
+GET  /api/results/{id}/frames/{campo}                          → frames binarios float32
+POST /api/train              {epochs, lr, …}                   → entrenamiento con eventos por época
+WS   /ws/events                                                → consola/progreso/losses en vivo
+POST /api/export             {result_id, format, field, frame} → 10 formatos
+POST /api/tools/mesh · /api/tools/refine · GET/POST /api/gpu
+```
+
+Los solvers se pueden verificar sin servidor:
 
 ```bash
 cd pinn-maxwell
-
-# Entrenamiento completo (Adam 30k + L-BFGS 5k épocas)
-python main.py --train
-
-# Entrenamiento rápido para prueba (50 + 10 épocas)
-python main.py --train --quick
-
-# Pipeline completo: entrenar + evaluar + visualizar
-python main.py --full-pipeline
-
-# Evaluar modelo guardado
-python main.py --evaluate
-
-# Análisis de sensibilidad
-python main.py --sensitivity
-
-# Modo TM₂₁ experimental
-python main.py --higher-mode
-```
-
-### Uso de GPU
-
-El entrenamiento detecta CUDA automáticamente. Para forzar CPU:
-
-```bash
-# En Windows, verificar GPU disponible
-python -c "import torch; print(torch.cuda.is_available())"
+python fdtd.py          # convergencia O(dx²) vs analítica + conservación de energía
+python comparison.py    # pipeline de comparación validado con la solución exacta
+python exporters.py     # prueba de los 9 exportadores
+python main.py --train  # entrenamiento completo del PINN (Adam + L-BFGS)
 ```
 
 ---
 
-##  ¿Qué se puede demostrar con la demo?
-
-### 1. Solución sin Malla
-La PINN evalúa (x, y, t) → (Ez, Bx, By) en cualquier punto continuo del dominio  
-→ **sin discretización, sin interpolación**
-
-### 2. Generalización del Medio
-Cambiar ε_r y μ_r **sin re-entrenar** → la onda cambia velocidad en tiempo real  
-→ `t_eff = t / √(ε_r · μ_r)` adapta la física post-proceso
-
-### 3. Naturaleza Vectorial de Maxwell
-Las flechas B rotan perpendiculares al gradiente de Ez  
-→ Visualización directa de las leyes de Faraday y Ampere
-
-### 4. El Cubo Espacio-Temporal
-El eje Z del cubo = tiempo t ∈ [0, T_MAX]  
-→ La losa que sube es el "ahora" moviéndose a través del espacio-tiempo EM
-
----
-
-##  Referencias
+## Referencias
 
 - Raissi, M., Perdikaris, P., & Karniadakis, G. E. (2019). *Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations.* Journal of Computational Physics.
 - Tancik, M. et al. (2020). *Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains.* NeurIPS.
-- Jin, X. et al. (2021). *NSFnets (Navier-Stokes Flow nets): Physics-informed neural networks for the incompressible Navier-Stokes equations.* JCP.
+- Yee, K. (1966). *Numerical solution of initial boundary value problems involving Maxwell's equations in isotropic media.* IEEE Transactions on Antennas and Propagation.
+- Taflove, A., & Hagness, S. C. (2005). *Computational Electrodynamics: The Finite-Difference Time-Domain Method.* Artech House.
 
 ---
 
-##  Autor
+## Autor
 
-**Manuel Sanabria** — Proyecto de investigación universitaria  
-Aproximación de Ecuaciones de Maxwell con Redes Neuronales Informadas por la Física
+**Manuel Sanabria** — Proyecto de investigación universitaria
+Aproximación de las Ecuaciones de Maxwell con Redes Neuronales Informadas por la Física, validada contra FDTD.
 
 [![GitHub](https://img.shields.io/badge/GitHub-ManuelSanabria2-black?logo=github)](https://github.com/ManuelSanabria2)

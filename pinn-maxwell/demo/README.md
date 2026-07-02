@@ -1,51 +1,33 @@
-# Cámara de Faraday Digital — Demo de Presentación
+# Fluxia — Frontend
 
-## Inicio Rápido
+Interfaz web profesional (estilo CAD) del entorno de simulación **PINN vs FDTD**.
+Sustituye a la antigua "Cámara de Faraday Digital".
+
+## Inicio rápido
 
 ```bash
-# 1. Desde el directorio pinn-maxwell/
-pip install fastapi uvicorn
-
-# 2. Levantar el servidor (el modelo debe estar entrenado)
+# Desde pinn-maxwell/
+pip install -r ../requirements.txt
 uvicorn server:app --port 8000
-
-# 3. Abrir en el navegador
-# http://localhost:8000/demo
+# → http://localhost:8000/demo
 ```
 
-> Si el modelo no está entrenado: `python main.py --train` primero.
+## Módulos
 
-## Controles
-
-| Control | Acción |
+| Archivo | Rol |
 |---|---|
-| **Arrastrar** | Rotar la cámara 3D |
-| **Scroll** | Zoom in/out |
-| **Space** | Play / Pause |
-| Slider **Tiempo t** | Scrubbing temporal manual |
-| Slider **Velocidad** | x0.1 a x4 |
-| Slider **ε_r** | Cambiar permitividad (contrae λ) |
-| Slider **μ_r** | Cambiar permeabilidad (contrae λ) |
-| Botones **XY / XT / YT** | Cambiar modo de corte |
-| **Malla Fantasma** | Toggle puntos de colocación |
-| **Vectores B** | Toggle flechas del campo magnético |
+| `index.html` | Layout: menús, explorador, viewport 3D, propiedades, dock inferior, diálogos |
+| `style.css` | Tema oscuro de ingeniería |
+| `js/app.js` | Arranque, acciones de menú, orquestación de simulaciones |
+| `js/api.js` | Cliente REST + WebSocket (`/api/*`, `/ws/events`) |
+| `js/state.js` | Estado central: proyecto, selección, resultado, reproductor |
+| `js/viewport.js` | Escena Three.js: dominio, materiales, fuente, PML, campo, isolíneas, cortes, medición |
+| `js/ui.js` | Árbol del proyecto, panel de propiedades, consola, menús, herramientas |
+| `js/panels.js` | Entrenamiento en vivo, comparación 2×2, gráficas, reproductor, exportación |
+| `js/charts.js` | Gráficas de línea, heatmaps y FFT en canvas puro (sin dependencias) |
 
-## Modos de Visualización
+## Atajos
 
-- **XY (t)** — Vista instantánea del campo Ez en el plano espacial 2D. La losa se desplaza
-  verticalmente a lo largo del eje Z (tiempo) del cubo espacio-temporal.
-- **XT (y fijo)** — Diagrama espacio-temporal Ez(x, t) a y = posición fija.
-- **YT (x fijo)** — Diagrama espacio-temporal Ez(y, t) a x = posición fija.
+`F5` PINN · `F6` FDTD · `F7` ambos · `Espacio` play/pausa · `Ctrl+S` guardar · `Ctrl+O` abrir · `Ctrl+N` nuevo proyecto
 
-## Modo Offline
-
-Si el servidor no está corriendo, la demo usa automáticamente la **solución analítica exacta**
-calculada en el navegador. El badge superior indica el modo activo.
-
-## Dependencias
-
-```
-fastapi
-uvicorn
-torch (ya instalado para el PINN)
-```
+Ver el README principal del repositorio para la documentación completa.

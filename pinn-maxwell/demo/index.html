@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Faraday Digital — Maxwell PINN</title>
+  <title>Fluxia — Maxwell PINN vs FDTD</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script type="importmap">
     {
@@ -18,1443 +18,352 @@
 </head>
 <body>
 
-<div id="loader">
-  <div class="loader-wave">
-    <span></span><span></span><span></span><span></span><span></span>
+<!-- ═══════════════ BARRA DE MENÚS ═══════════════ -->
+<header id="menubar">
+  <div class="brand">
+    <span class="brand-mark">◈</span>
+    <span class="brand-name">Fluxia</span>
+    <span class="brand-sub">Maxwell PINN · FDTD</span>
   </div>
-  <h2>Resolviendo Maxwell PINN</h2>
-  <p style="color: var(--text-muted); font-size: 11px; margin-top: 5px;">Sincronizando campos electromagnéticos...</p>
-</div>
 
-<!-- ═══ TOPBAR ═══ -->
-<div id="topbar">
-  <div class="topbar-left">
-    <span class="topbar-title">Faraday Digital</span>
-    <span class="topbar-subtitle">Physics-Informed Neural Networks</span>
+  <nav id="menus">
+    <div class="menu" data-menu="archivo">
+      <button class="menu-btn">Archivo</button>
+      <div class="menu-drop">
+        <button data-action="file-new">Nuevo proyecto <kbd>Ctrl+N</kbd></button>
+        <button data-action="file-open">Abrir… <kbd>Ctrl+O</kbd></button>
+        <button data-action="file-save">Guardar <kbd>Ctrl+S</kbd></button>
+        <hr>
+        <button data-action="export-dialog">Exportar resultados…</button>
+        <button data-action="export-png">Exportar imágenes (PNG)</button>
+        <button data-action="export-video">Exportar video (WebM)</button>
+        <button data-action="export-gif">Exportar video (GIF servidor)</button>
+        <hr>
+        <button data-action="export-vtk">Exportar VTK</button>
+        <button data-action="export-csv">Exportar CSV</button>
+        <button data-action="export-mat">Exportar MATLAB</button>
+      </div>
+    </div>
+
+    <div class="menu" data-menu="simulacion">
+      <button class="menu-btn">Simulación</button>
+      <div class="menu-drop">
+        <button data-action="run-pinn">Ejecutar PINN <kbd>F5</kbd></button>
+        <button data-action="run-fdtd">Ejecutar FDTD <kbd>F6</kbd></button>
+        <button data-action="run-both"><b>Ejecutar ambos (comparar)</b> <kbd>F7</kbd></button>
+        <hr>
+        <button data-action="run-train">Entrenar PINN…</button>
+        <button data-action="run-stop">Detener</button>
+      </div>
+    </div>
+
+    <div class="menu" data-menu="herramientas">
+      <button class="menu-btn">Herramientas</button>
+      <div class="menu-drop">
+        <button data-action="tool-mesh">Generador de malla…</button>
+        <button data-action="tool-refine">Refinamiento adaptativo…</button>
+        <button data-action="tool-materials">Inspector de materiales…</button>
+        <button data-action="tool-gpu">Configuración GPU…</button>
+      </div>
+    </div>
+
+    <div class="menu" data-menu="visualizacion">
+      <button class="menu-btn">Visualización</button>
+      <div class="menu-drop" id="menu-vis">
+        <div class="menu-group">Campo mostrado</div>
+        <button data-field="E"><span class="check">✓</span> Campo E (Ez)</button>
+        <button data-field="H"><span class="check">✓</span> Campo H (|B|)</button>
+        <button data-field="energy"><span class="check">✓</span> Densidad de energía</button>
+        <button data-field="poynting"><span class="check">✓</span> Flujo de Poynting</button>
+        <button data-field="errPINN"><span class="check">✓</span> Error PINN</button>
+        <button data-field="errFDTD"><span class="check">✓</span> Error FDTD</button>
+        <hr>
+        <div class="menu-group">Superposiciones</div>
+        <button data-toggle="iso"><span class="check">✓</span> Isosuperficies (isolíneas)</button>
+        <button data-toggle="sliceXY"><span class="check">✓</span> Corte XY</button>
+        <button data-toggle="sliceXZ"><span class="check">✓</span> Corte XZ</button>
+        <button data-toggle="sliceYZ"><span class="check">✓</span> Corte YZ</button>
+        <button data-toggle="mesh"><span class="check">✓</span> Malla</button>
+        <button data-toggle="axes"><span class="check">✓</span> Ejes</button>
+      </div>
+    </div>
+
+    <div class="menu" data-menu="ayuda">
+      <button class="menu-btn">Ayuda</button>
+      <div class="menu-drop">
+        <button data-action="help-manual">Manual</button>
+        <button data-action="help-docs">Documentación</button>
+        <button data-action="help-math">Información matemática</button>
+        <hr>
+        <button data-action="help-version">Versión</button>
+      </div>
+    </div>
+  </nav>
+
+  <div id="statusbar-top">
+    <span class="chip" id="chip-device">CPU</span>
+    <span class="chip" id="chip-model">PINN —</span>
+    <span class="chip chip-status" id="chip-status">Conectando…</span>
   </div>
-  <div class="topbar-right">
-    <div class="topbar-item">
-      <span class="eyebrow">Estado</span>
-      <span class="mono-value" id="mode-badge">Analítica</span>
-    </div>
-    <div class="topbar-item">
-      <span class="eyebrow">FPS</span>
-      <span class="mono-value" id="s-fps">60</span>
-    </div>
-    <div class="topbar-item">
-      <span class="eyebrow">Ez</span>
-      <span class="mono-value" id="s-ez">0.000</span>
-    </div>
-    <div class="topbar-item">
-      <span class="eyebrow">|B|</span>
-      <span class="mono-value" id="s-bm">0.000</span>
-    </div>
-  </div>
-</div>
+</header>
 
-<!-- ═══ LAYOUT ═══ -->
-<div class="layout">
+<!-- ═══════════════ ESPACIO DE TRABAJO ═══════════════ -->
+<div id="workspace">
 
-  <!-- ─── MAIN AREA ─── -->
-  <div class="main-area">
+  <!-- ─── EXPLORADOR DEL PROYECTO ─── -->
+  <aside id="explorer">
+    <div class="panel-title">Explorador del proyecto</div>
+    <div id="tree"></div>
+  </aside>
+
+  <!-- ─── CENTRO ─── -->
+  <main id="center">
+    <div id="view-tabs">
+      <button class="view-tab active" data-view="viewport">Vista 3D</button>
+      <button class="view-tab" data-view="compare">Comparación PINN vs FDTD</button>
+    </div>
 
     <!-- Viewport 3D -->
-    <div class="viewport-card">
-      <div class="viewport-header">
-        <span class="eyebrow">Visualizaci&oacute;n 3D &mdash; Cavidad TM<sub>11</sub></span>
-        <span class="viewport-badge">Cavidad TM<sub>11</sub></span>
+    <div id="viewport-container" class="center-view">
+      <canvas id="viewport"></canvas>
+      <div id="vp-toolbar">
+        <button id="vp-btn-measure" title="Medir distancias">📐</button>
+        <button id="vp-btn-home" title="Restablecer cámara">⌂</button>
       </div>
-      <div class="viewport-body">
-        <canvas id="c"></canvas>
-        <div id="colorbar">
-          <span class="cb-lbl" id="cb-max">+1.00</span>
-          <div id="cb-grad"></div>
-          <span class="cb-lbl" id="cb-min">0.00</span>
-          <span class="cb-lbl" id="cb-title">|B|</span>
+      <div id="vp-colorbar">
+        <span id="cb-max">+1.00</span>
+        <div id="cb-grad"></div>
+        <span id="cb-min">−1.00</span>
+        <span id="cb-field">Ez</span>
+      </div>
+      <div id="vp-hint">Rotar: arrastrar · Zoom: rueda · Pan: botón der. · Seleccionar: clic</div>
+      <div id="vp-measure-label" hidden></div>
+      <div id="vp-source-label">PINN (en vivo)</div>
+    </div>
+
+    <!-- Comparación -->
+    <div id="compare-container" class="center-view" hidden>
+      <div id="cmp-controls">
+        <label>Mapa de error:
+          <select id="cmp-err-mode">
+            <option value="abs">|PINN − FDTD| (absoluto)</option>
+            <option value="rel">Error relativo (%)</option>
+          </select>
+        </label>
+        <label>Escala error:
+          <select id="cmp-err-scale">
+            <option value="auto">Auto</option>
+            <option value="global">Global (todos los frames)</option>
+          </select>
+        </label>
+        <span id="cmp-no-data">Ejecuta <b>Simulación → Ejecutar ambos</b> para comparar.</span>
+      </div>
+      <div id="cmp-grid">
+        <div class="cmp-cell">
+          <div class="cmp-title">PINN</div>
+          <canvas id="cmp-pinn"></canvas>
+        </div>
+        <div class="cmp-cell">
+          <div class="cmp-title">FDTD (referencia)</div>
+          <canvas id="cmp-fdtd"></canvas>
+        </div>
+        <div class="cmp-cell">
+          <div class="cmp-title" id="cmp-err-title">|PINN − FDTD|</div>
+          <canvas id="cmp-err"></canvas>
+        </div>
+        <div class="cmp-cell cmp-metrics">
+          <div class="cmp-title">Métricas</div>
+          <div id="cmp-metrics-body"></div>
         </div>
       </div>
     </div>
 
-    <!-- Pipeline -->
-    <div class="pipeline-card">
-      <div class="pipeline-step" id="step-colloc">
-        <span class="step-num">01</span>
-        <span class="step-label">Puntos de Colocaci&oacute;n</span>
-        <span class="step-desc">Muestreo continuo (x, y, t)</span>
-      </div>
-      <div class="pipeline-step" id="step-pinn">
-        <span class="step-num">02</span>
-        <span class="step-label">Red Neuronal</span>
-        <span class="step-desc">Fourier Features + MLP</span>
-      </div>
-      <div class="pipeline-step" id="step-fields">
-        <span class="step-num">03</span>
-        <span class="step-label">Campos Aproximados</span>
-        <span class="step-desc">Ez, Bx, By simult&aacute;neos</span>
-      </div>
-      <div class="pipeline-step" id="step-pde">
-        <span class="step-num">04</span>
-        <span class="step-label">Ecuaciones Maxwell</span>
-        <span class="step-desc">Gradientes v&iacute;a Autograd</span>
-      </div>
-      <div class="pipeline-step" id="step-loss">
-        <span class="step-num">05</span>
-        <span class="step-label">P&eacute;rdida Residual</span>
-        <span class="step-desc">Adam + L-BFGS</span>
-      </div>
-    </div>
-
-    <!-- Validation (collapsible) -->
-    <div class="fold-section">
-      <div class="fold-header" id="fold-toggle" onclick="toggleValidationFold(this)">
-        <span class="fold-arrow">&#9654;</span>
-        <span class="eyebrow" style="display:inline;font-size:9px;">Validaci&oacute;n PINN vs Anal&iacute;tica</span>
-        <span class="fold-count" id="fold-count"></span>
-      </div>
-      <div class="fold-body" id="fold-body">
-        <div class="validation-grid">
-          <div class="val-card">
-            <div class="val-card-header"><h4>Ez &mdash; PINN</h4><span class="val-badge pinn">PINN</span></div>
-            <div class="val-card-body"><canvas id="cmp-pinn" width="120" height="120"></canvas></div>
-          </div>
-          <div class="val-card">
-            <div class="val-card-header"><h4>Ez &mdash; Anal&iacute;tica</h4><span class="val-badge analytical">Anal&iacute;tica</span></div>
-            <div class="val-card-body"><canvas id="cmp-analytical" width="120" height="120"></canvas></div>
-          </div>
-          <div class="val-card">
-            <div class="val-card-header"><h4>|Error| Absoluto</h4><span class="val-badge pinn" style="background:var(--surface);color:var(--text-muted);border:1px solid var(--border);">L2</span></div>
-            <div class="val-card-body"><canvas id="cmp-error" width="120" height="120"></canvas></div>
-          </div>
-          <div class="val-card">
-            <div class="val-card-header"><h4>Resumen</h4><span class="val-badge analytical">M&eacute;tricas</span></div>
-            <div class="val-card-body" id="cmp-summary" style="padding:8px;font-size:10px;color:var(--text-muted);display:flex;flex-direction:column;justify-content:center;">
-              Cargando...
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ─── SIDEBAR ─── -->
-  <div class="sidebar">
-
-    <!-- Temporal Control -->
-    <div class="sidebar-section">
-      <span class="eyebrow">Control temporal</span>
-      <div class="slider-row">
-        <span class="lbl">Tiempo t</span>
-        <span class="mono-value" id="v-t">0.000 s</span>
-      </div>
-      <input type="range" id="sl-t" min="0" max="2.828" step="0.004" value="0">
-      <div class="slider-limits"><span>0.00s</span><span>2.83s (2T)</span></div>
-      <div class="slider-row" style="margin-top:8px;">
-        <span class="lbl">Velocidad</span>
-        <span class="mono-value" id="v-sp">1.0x</span>
-      </div>
-      <input type="range" id="sl-sp" min="0.1" max="4" step="0.1" value="1">
-      <div class="slider-limits"><span>0.1x</span><span>4.0x</span></div>
-      <button class="btn" id="btn-play" style="margin-top:4px;">Pausar Simulaci&oacute;n</button>
-    </div>
-
-    <!-- Cut Plane -->
-    <div class="sidebar-section">
-      <span class="eyebrow">Plano de corte</span>
-      <div class="seg-ctrl">
-        <div class="seg-btn active" data-axis="xy">XY</div>
-        <div class="seg-btn" data-axis="xz">XT</div>
-        <div class="seg-btn" data-axis="yz">YT</div>
-      </div>
-      <div id="pos-wrap" style="display:none">
-        <div class="slider-row">
-          <span class="lbl">Corte</span>
-          <span class="mono-value" id="v-pos">0.50</span>
-        </div>
-        <input type="range" id="sl-pos" min="0.02" max="0.98" step="0.01" value="0.5">
-      </div>
-      <div class="slider-row" style="margin-top:6px;">
-        <span class="lbl">Resoluci&oacute;n</span>
-        <span class="mono-value" id="v-res">64</span>
-      </div>
-      <input type="range" id="sl-res" min="24" max="96" step="8" value="64">
-      <div class="slider-limits"><span>24&times;24</span><span>96&times;96</span></div>
-    </div>
-
-    <!-- Visualization Layers -->
-    <div class="sidebar-section">
-      <span class="eyebrow">Capas de visualizaci&oacute;n</span>
-      <select class="field-select" id="field-mode">
-        <option value="ez">Campo El&eacute;ctrico Ez</option>
-        <option value="bmag" selected>Magnitud Magn&eacute;tica |B|</option>
-        <option value="energy">Densidad de Energ&iacute;a</option>
-        <option value="residual">Residual PDE</option>
+    <!-- Reproductor de animación -->
+    <div id="player-bar">
+      <button id="pl-first" title="Inicio">⏮</button>
+      <button id="pl-prev" title="Anterior">◀</button>
+      <button id="pl-play" title="Reproducir">▶</button>
+      <button id="pl-pause" title="Pausa" hidden>⏸</button>
+      <button id="pl-last" title="Final">⏭</button>
+      <input type="range" id="pl-slider" min="0" max="59" step="1" value="0">
+      <span id="pl-time" class="mono">t = 0.000</span>
+      <select id="pl-speed" title="Velocidad">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="10">10×</option>
       </select>
-      <div class="toggle-row">
-        <span class="lbl">Curvas de Nivel</span>
-        <div class="toggle-dot on" id="tog-contours"></div>
+    </div>
+  </main>
+
+  <!-- ─── PROPIEDADES ─── -->
+  <aside id="props">
+    <div class="panel-title">Propiedades</div>
+    <div id="props-body"><p class="muted">Selecciona un objeto del árbol o de la vista 3D.</p></div>
+  </aside>
+</div>
+
+<!-- ═══════════════ DOCK INFERIOR ═══════════════ -->
+<div id="dock">
+  <div id="dock-tabs">
+    <button class="dock-tab active" data-dock="console">Consola</button>
+    <button class="dock-tab" data-dock="training">Entrenamiento PINN</button>
+    <button class="dock-tab" data-dock="graphs">Gráficas</button>
+    <span class="dock-spacer"></span>
+    <button id="dock-collapse" title="Plegar/desplegar">▾</button>
+  </div>
+
+  <div id="dock-body">
+    <!-- Consola -->
+    <div class="dock-view" id="dock-console">
+      <div id="console-out"></div>
+    </div>
+
+    <!-- Entrenamiento -->
+    <div class="dock-view" id="dock-training" hidden>
+      <div id="train-side">
+        <div class="train-stat"><span class="eyebrow">Época</span><span class="mono big" id="tr-epoch">—</span></div>
+        <div class="train-stat"><span class="eyebrow">Loss PDE</span><span class="mono" id="tr-pde">—</span></div>
+        <div class="train-stat"><span class="eyebrow">Loss BC</span><span class="mono" id="tr-bc">—</span></div>
+        <div class="train-stat"><span class="eyebrow">Loss IC</span><span class="mono" id="tr-ic">—</span></div>
+        <div class="train-stat"><span class="eyebrow">Learning rate</span><span class="mono" id="tr-lr">—</span></div>
+        <div class="train-stat"><span class="eyebrow">Tiempo</span><span class="mono" id="tr-time">—</span></div>
+        <button id="tr-start" class="btn-primary">Entrenar…</button>
+        <button id="tr-stop" class="btn-danger" hidden>Detener</button>
       </div>
-      <div class="toggle-row">
-        <span class="lbl">Streamlines RK4</span>
-        <div class="toggle-dot on" id="tog-stream"></div>
-      </div>
-      <div class="toggle-row">
-        <span class="lbl">Vectores B</span>
-        <div class="toggle-dot on" id="tog-vec"></div>
-      </div>
-      <div class="toggle-row">
-        <span class="lbl">Malla Fantasma</span>
-        <div class="toggle-dot on" id="tog-ghost"></div>
-      </div>
-      <div class="toggle-row">
-        <span class="lbl">Frontera PEC</span>
-        <div class="toggle-dot on" id="tog-box"></div>
+      <div id="train-charts">
+        <canvas id="tr-chart-loss"></canvas>
+        <canvas id="tr-chart-lr"></canvas>
       </div>
     </div>
 
-    <!-- Medium Physics -->
-    <div class="sidebar-section">
-      <span class="eyebrow">F&iacute;sica del medio</span>
-      <div class="slider-row">
-        <span class="lbl">&epsilon;<sub>r</sub></span>
-        <span class="mono-value" id="v-eps">1.00</span>
+    <!-- Gráficas -->
+    <div class="dock-view" id="dock-graphs" hidden>
+      <div id="graph-tabs">
+        <button class="gtab active" data-graph="point">Campo en un punto</button>
+        <button class="gtab" data-graph="fft">Espectro (FFT)</button>
+        <button class="gtab" data-graph="energy">Energía</button>
+        <button class="gtab" data-graph="error">Error</button>
+        <button class="gtab" data-graph="residual">Residual PDE</button>
       </div>
-      <input type="range" id="sl-eps" min="1" max="10" step="0.25" value="1">
-      <div class="slider-limits"><span>1.0 (Vac&iacute;o)</span><span>10.0</span></div>
-      <div class="slider-row" style="margin-top:8px;">
-        <span class="lbl">&mu;<sub>r</sub></span>
-        <span class="mono-value" id="v-mu">1.00</span>
-      </div>
-      <input type="range" id="sl-mu" min="1" max="5" step="0.25" value="1">
-      <div class="slider-limits"><span>1.0 (Vac&iacute;o)</span><span>5.0</span></div>
-      <div class="slider-row" style="margin-top:8px;">
-        <span class="lbl">Frecuencia</span>
-        <span class="mono-value" id="v-freq">1.00x</span>
-      </div>
-      <input type="range" id="sl-freq" min="0.5" max="2.5" step="0.05" value="1">
-      <div class="slider-limits"><span>0.5x</span><span>2.5x</span></div>
-      <div class="slider-row" style="margin-top:8px;">
-        <span class="lbl">P&eacute;rdidas</span>
-        <span class="mono-value" id="v-sigma">0.00</span>
-      </div>
-      <input type="range" id="sl-sigma" min="0" max="0.7" step="0.02" value="0">
-      <div class="slider-limits"><span>0.0</span><span>0.7</span></div>
+      <canvas id="graph-canvas"></canvas>
+      <div id="graph-note" class="muted"></div>
     </div>
-
-    <!-- Maxwell Residuals -->
-    <div class="sidebar-section">
-      <span class="eyebrow">Residuales Maxwell</span>
-      <div class="residual-list">
-        <div class="residual-item">
-          <div class="res-head">
-            <span class="res-name">Faraday X</span>
-            <span class="res-value" id="res-fx" style="color:var(--text-muted)">--</span>
-          </div>
-          <div class="res-bar-bg"><div class="res-bar" id="bar-fx"></div></div>
-        </div>
-        <div class="residual-item">
-          <div class="res-head">
-            <span class="res-name">Faraday Y</span>
-            <span class="res-value" id="res-fy" style="color:var(--text-muted)">--</span>
-          </div>
-          <div class="res-bar-bg"><div class="res-bar" id="bar-fy"></div></div>
-        </div>
-        <div class="residual-item">
-          <div class="res-head">
-            <span class="res-name">Amp&egrave;re</span>
-            <span class="res-value" id="res-am" style="color:var(--text-muted)">--</span>
-          </div>
-          <div class="res-bar-bg"><div class="res-bar" id="bar-am"></div></div>
-        </div>
-        <div class="residual-item">
-          <div class="res-head">
-            <span class="res-name">Gauss B</span>
-            <span class="res-value" id="res-ga" style="color:var(--text-muted)">--</span>
-          </div>
-          <div class="res-bar-bg"><div class="res-bar" id="bar-ga"></div></div>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>
 
-<!-- ═══ HIDDEN STUBS (JS COMPATIBILITY) ═══ -->
-<div id="hero-panel" style="display:none">
-  <div class="hero-header">
-    <div class="hero-title-group">
-      <span class="hero-tag">Physics-Informed Neural Networks</span>
-      <h2>C&aacute;mara de Faraday Digital</h2>
-    </div>
-    <button id="btn-hero-toggle" class="btn-icon"></button>
+<!-- ═══════════════ DIÁLOGOS ═══════════════ -->
+<dialog id="dlg-export">
+  <h3>Exportar resultados</h3>
+  <p class="muted" id="exp-result-info">—</p>
+  <div class="form-grid">
+    <label>Formato
+      <select id="exp-format">
+        <option value="pdf">PDF técnico (informe)</option>
+        <option value="csv">CSV (campo en frame)</option>
+        <option value="csv-series">CSV (series de error)</option>
+        <option value="npz">NumPy (.npz)</option>
+        <option value="hdf5">HDF5 (.h5)</option>
+        <option value="vtk">VTK (ParaView)</option>
+        <option value="mat">MATLAB (.mat)</option>
+        <option value="gif">GIF animado</option>
+        <option value="png">PNG (comparación 2×2)</option>
+        <option value="stl">STL de geometrías</option>
+      </select>
+    </label>
+    <label>Campo
+      <select id="exp-field"></select>
+    </label>
+    <label>Frame <input type="number" id="exp-frame" min="0" value="0"></label>
   </div>
-  <div class="hero-body">
-    <div class="hero-tabs">
-      <button class="tab-btn active" data-tab="tab-hace"></button>
-      <button class="tab-btn" data-tab="tab-funciona"></button>
-      <button class="tab-btn" data-tab="tab-ecuaciones"></button>
-      <button class="tab-btn" data-tab="tab-visualiza"></button>
-    </div>
-    <div class="tab-panes">
-      <div class="tab-pane active" id="tab-hace"></div>
-      <div class="tab-pane" id="tab-funciona"></div>
-      <div class="tab-pane" id="tab-ecuaciones"></div>
-      <div class="tab-pane" id="tab-visualiza"></div>
-    </div>
+  <div class="dlg-actions">
+    <button class="btn-secondary" data-close>Cancelar</button>
+    <button class="btn-primary" id="exp-go">Exportar</button>
   </div>
-</div>
-<div id="compare-panel" style="display:none"></div>
-<div id="diag-panel" style="display:none">
-  <h3>Diagn&oacute;stico de Entrenamiento</h3>
-  <div class="diag-chart-wrap">
-    <div class="diag-chart-box"><canvas id="diag-loss"></canvas><span class="diag-chart-label">P&eacute;rdida vs &Eacute;pocas</span></div>
-    <div class="diag-chart-box"><canvas id="diag-residual"></canvas><span class="diag-chart-label">Residuales PDE</span></div>
-    <div class="diag-chart-box" style="flex:0.6;"><div style="padding:6px;font-size:9px;color:var(--text-muted);"><div id="diag-params"></div></div></div>
+</dialog>
+
+<dialog id="dlg-train">
+  <h3>Entrenar PINN</h3>
+  <div class="form-grid">
+    <label>Épocas <input type="number" id="tr-opt-epochs" value="800" min="10" max="50000"></label>
+    <label>Learning rate <input type="number" id="tr-opt-lr" value="0.001" step="0.0001"></label>
+    <label>Puntos de colocación <input type="number" id="tr-opt-ncol" value="3000" min="100"></label>
+    <label>Puntos IC <input type="number" id="tr-opt-nic" value="1500" min="100"></label>
+    <label><input type="checkbox" id="tr-opt-reset"> Reinicializar pesos (desde cero)</label>
+    <label><input type="checkbox" id="tr-opt-save" checked> Guardar modelo al terminar</label>
   </div>
-</div>
-<div id="mode-selector" style="display:none">
-  <select id="sim-mode">
-    <option value="cavity">Cavidad Resonante TM&#8321;&#8321;</option>
-    <option value="propagation">Propagaci&oacute;n de Onda</option>
-    <option value="gaussian">Pulso Gaussiano</option>
-    <option value="antenna">Emisi&oacute;n de Antena</option>
-  </select>
-  <select id="model-selector">
-    <option value="auto">Autom&aacute;tico</option>
-    <option value="pinn">PINN</option>
-    <option value="analytical">Anal&iacute;tico</option>
-    <option value="comparison">Comparaci&oacute;n</option>
-  </select>
-</div>
-<div id="export-panel" style="display:none">
-  <button class="export-btn" id="export-png">PNG</button>
-  <button class="export-btn" id="export-csv">CSV</button>
-  <button class="export-btn" id="export-json">JSON</button>
-  <button class="export-btn" id="export-config">Config</button>
-  <button class="export-btn" id="btn-benchmark">Benchmark</button>
-  <span id="export-status" style="font-size:8px;color:var(--text-muted);"></span>
-</div>
-<div id="compare-toggle-btn" style="display:none"></div>
-
-<!-- ═══ SCRIPT ═══ -->
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-const T_MAX = 2.828427;
-const OMEGA = Math.PI * Math.SQRT2;
-const API = location.protocol.startsWith('http') ? location.origin : 'http://127.0.0.1:8000';
-const tEff = (t, e, m, f) => t * f / Math.sqrt(Math.max(e * m, 1e-9));
-const damp = (t, s) => Math.exp(-Math.max(0, s) * Math.max(0, t));
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-
-const S = {
-  t: 0, axis: 'xy', position: 0.5, eps_r: 1, mu_r: 1, freq_scale: 1, sigma_wall: 0,
-  speed: 1, playing: true, resolution: 64, fieldMode: 'bmag',
-  showGhost: true, showVec: true, showBox: true, showStream: true, showContours: true,
-  usePINN: false, sliceData: null, gridData: null, residualMap: null,
-  fetchPending: false, gridPending: false, resPending: false,
-  lastFetch: 0, fetchDirty: false, lastGrid: 0, lastResidual: 0, residualHistory: []
-};
-
-const infernoMap = [[0,0,4],[40,11,84],[101,21,110],[159,42,99],[212,72,66],[245,125,21],[252,187,54],[252,255,164]];
-const divergeMap = [[33,102,172],[103,169,207],[209,229,240],[247,247,247],[253,219,199],[239,138,98],[178,24,43]];
-
-function getColor(v, min, max, map) {
-  const t = clamp((v - min) / (max - min || 1), 0, 1);
-  const p = t * (map.length - 1), i = Math.min(map.length - 2, Math.floor(p)), u = p - i;
-  return map[i].map((a, k) => Math.round(a + (map[i+1][k] - a) * u));
-}
-
-function fieldAt(x, y, t) {
-  const te = tEff(t, S.eps_r, S.mu_r, S.freq_scale);
-  const a = damp(t, S.sigma_wall);
-  const Ez = Math.sin(Math.PI*x) * Math.sin(Math.PI*y) * Math.cos(OMEGA*te) * a;
-  const Bx = -(Math.PI/OMEGA) * Math.sin(Math.PI*x) * Math.cos(Math.PI*y) * Math.sin(OMEGA*te) * a;
-  const By =  (Math.PI/OMEGA) * Math.cos(Math.PI*x) * Math.sin(Math.PI*y) * Math.sin(OMEGA*te) * a;
-  return { Ez, Bx, By };
-}
-
-const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.setClearColor(0x0a0c10, 1);
-
-function updateRendererSize() {
-  const container = canvas.parentElement;
-  if (!container) return;
-  const w = container.clientWidth;
-  const h = container.clientHeight;
-  if (w > 0 && h > 0) {
-    renderer.setSize(w, h);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  }
-}
-
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, 1.6, 0.1, 100);
-updateRendererSize();
-const ro = new ResizeObserver(updateRendererSize);
-ro.observe(canvas.parentElement);
-camera.position.set(2.2, 1.8, 2.2);
-const controls = new OrbitControls(camera, canvas);
-controls.enableDamping = true;
-controls.target.set(0.5, 0.5, 0.5);
-
-scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-const dLight = new THREE.DirectionalLight(0xffffff, 1);
-dLight.position.set(2, 5, 3);
-scene.add(dLight);
-
-const boxLine = new THREE.LineSegments(
-  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.01, 1.01, 1.01)),
-  new THREE.LineBasicMaterial({ color: 0x4b5563, transparent: true, opacity: 0.5 })
-);
-boxLine.position.set(0.5, 0.5, 0.5);
-scene.add(boxLine);
-
-let sliceArr = new Uint8Array(S.resolution * S.resolution * 3);
-let sliceTex = new THREE.DataTexture(sliceArr, S.resolution, S.resolution, THREE.RGBFormat);
-const sliceMesh = new THREE.Mesh(
-  new THREE.PlaneGeometry(1, 1),
-  new THREE.MeshBasicMaterial({ map: sliceTex, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
-);
-scene.add(sliceMesh);
-
-const vectorGridSize = 15;
-const arrowCount = vectorGridSize * vectorGridSize;
-const arrowShape = new THREE.Shape();
-arrowShape.moveTo(0.015, 0);
-arrowShape.lineTo(-0.015, 0.01);
-arrowShape.lineTo(-0.005, 0);
-arrowShape.lineTo(-0.015, -0.01);
-arrowShape.lineTo(0.015, 0);
-const arrowGeometry = new THREE.ShapeGeometry(arrowShape);
-const arrowMaterial = new THREE.MeshBasicMaterial({
-  color: 0xffffff,
-  transparent: true,
-  opacity: 0.9,
-  side: THREE.DoubleSide
-});
-const arrowMesh = new THREE.InstancedMesh(arrowGeometry, arrowMaterial, arrowCount);
-scene.add(arrowMesh);
-
-const particleCount = 400;
-const particleGeometry = new THREE.BufferGeometry();
-const particlePositions = new Float32Array(particleCount * 3);
-const particleLifetimes = new Float32Array(particleCount);
-for(let i=0; i<particleCount; i++) {
-  particlePositions[i*3] = Math.random();
-  particlePositions[i*3+1] = Math.random();
-  particlePositions[i*3+2] = 0.5;
-  particleLifetimes[i] = Math.random();
-}
-particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-particleGeometry.setAttribute('lifetime', new THREE.BufferAttribute(particleLifetimes, 1));
-
-const particleMaterial = new THREE.PointsMaterial({
-  size: 0.015,
-  color: 0x00ffff,
-  transparent: true,
-  opacity: 0.8,
-  blending: THREE.AdditiveBlending
-});
-const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-scene.add(particleSystem);
-
-const ghostCount = 1000;
-const ghostGeometry = new THREE.BufferGeometry();
-const ghostPositions = new Float32Array(ghostCount * 3);
-for (let i = 0; i < ghostCount; i++) {
-  ghostPositions[i*3] = Math.random();
-  ghostPositions[i*3+1] = Math.random();
-  ghostPositions[i*3+2] = Math.random();
-}
-ghostGeometry.setAttribute('position', new THREE.BufferAttribute(ghostPositions, 3));
-const ghostMaterial = new THREE.PointsMaterial({
-  size: 0.007,
-  color: 0x60a5fa,
-  transparent: true,
-  opacity: 0.35,
-  blending: THREE.AdditiveBlending
-});
-const ghostPoints = new THREE.Points(ghostGeometry, ghostMaterial);
-scene.add(ghostPoints);
-
-const boxHoverGeom = new THREE.BoxGeometry(1.02, 1.02, 1.02);
-const boxHoverMat = new THREE.MeshBasicMaterial({ visible: false });
-const boxHoverMesh = new THREE.Mesh(boxHoverGeom, boxHoverMat);
-boxHoverMesh.position.set(0.5, 0.5, 0.5);
-scene.add(boxHoverMesh);
-
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const tooltip = document.createElement('div');
-tooltip.id = 'cage-tooltip';
-tooltip.style.position = 'absolute';
-tooltip.style.display = 'none';
-tooltip.style.pointerEvents = 'none';
-tooltip.style.padding = '10px 14px';
-tooltip.style.fontSize = '12px';
-tooltip.style.color = 'var(--text-secondary)';
-tooltip.style.background = 'var(--surface)';
-tooltip.style.border = '1px solid var(--border)';
-tooltip.style.borderRadius = '8px';
-tooltip.style.zIndex = '1000';
-tooltip.style.maxWidth = '260px';
-tooltip.innerHTML = `<strong>Jaula de Faraday (Cavidad PEC)</strong><br><br>
-Esta caja delimita las paredes conductoras perfectas (PEC). Las condiciones de contorno forzan que las componentes tangenciales del campo el&eacute;ctrico se anulen en las paredes. Esto confina y resuena la energ&iacute;a electromagn&eacute;tica del modo TM<sub>11</sub> en su interior.`;
-document.body.appendChild(tooltip);
-
-window.addEventListener('mousemove', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  tooltip.style.left = (e.clientX + 15) + 'px';
-  tooltip.style.top = (e.clientY + 15) + 'px';
-});
-
-async function checkAPI() {
-  try {
-    const r = await fetch(`${API}/api/health`);
-    S.usePINN = r.ok && (await r.json()).model_loaded;
-    document.getElementById('loader').style.opacity = '0';
-    setTimeout(() => document.getElementById('loader').style.visibility = 'hidden', 800);
-  } catch {
-    S.usePINN = false;
-    document.getElementById('loader').style.opacity = '0';
-    setTimeout(() => document.getElementById('loader').style.visibility = 'hidden', 800);
-  }
-  updateBadge();
-}
-
-function updateBadge() {
-  const el = document.getElementById('mode-badge');
-  el.textContent = S.usePINN ? 'PINN Activo' : 'Anal&iacute;tica';
-  el.className = `badge glass ${S.usePINN ? 'pinn' : 'analytical'}`;
-}
-
-async function updateData() {
-  const now = performance.now();
-
-  if (S.fetchDirty || (!S.fetchPending && now - S.lastFetch > 80)) {
-    S.fetchDirty = false;
-    S.fetchPending = true;
-    const payload = {
-      t: S.t, N: S.resolution, axis: S.axis, position: S.position,
-      eps_r: S.eps_r, mu_r: S.mu_r, freq_scale: S.freq_scale, sigma_wall: S.sigma_wall
-    };
-    try {
-      if (S.usePINN) {
-        const r = await fetch(`${API}/slice`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-        if (r.ok) S.sliceData = await r.json();
-      } else {
-        S.sliceData = analyticalSlice(S.resolution, S.axis, S.position, S.t);
-      }
-    } catch { S.usePINN = false; updateBadge(); }
-    applySlice();
-    S.lastFetch = now;
-    S.fetchPending = false;
-  }
-
-  if (!S.resPending && now - S.lastResidual > 1000) {
-    S.resPending = true;
-    try {
-      if (S.usePINN) {
-        const r = await fetch(`${API}/residuals`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ t: S.t, N: 15, eps_r: S.eps_r, mu_r: S.mu_r, freq_scale: S.freq_scale }) });
-        if (r.ok) updateResidualPanel(await r.json());
-      }
-    } catch {}
-    S.lastResidual = now;
-    S.resPending = false;
-  }
-}
-
-function updateResidualPanel(res) {
-  const ids = { fx: 'faraday_x', fy: 'faraday_y', am: 'ampere', ga: 'gauss_b' };
-  for (const [key, apiName] of Object.entries(ids)) {
-    const val = res[apiName];
-    if (val === undefined) continue;
-    document.getElementById(`res-${key}`).textContent = val.toExponential(1);
-    document.getElementById(`res-${key}`).style.color = val < 1e-3 ? 'var(--success)' : (val < 1e-2 ? 'var(--warning)' : 'var(--error)');
-    const bar = document.getElementById(`bar-${key}`);
-    if (bar) {
-      bar.style.width = Math.min(100, Math.max(5, (val/1e-2)*100)) + '%';
-      bar.style.background = val < 1e-3 ? 'var(--success)' : (val < 1e-2 ? 'var(--warning)' : 'var(--error)');
-    }
-  }
-}
-
-function applyVectors() {
-  if (!S.showVec) { arrowMesh.count = 0; return; }
-  const dummy = new THREE.Object3D();
-  let idx = 0;
-  const N = vectorGridSize;
-  const maxMag = 0.35;
-
-  for (let j = 0; j < N; j++) {
-    for (let i = 0; i < N; i++) {
-      const x = 0.05 + (i / (N-1)) * 0.9;
-      const y = 0.05 + (j / (N-1)) * 0.9;
-      const f = fieldAt(x, y, S.t);
-      const bx = f.Bx, by = f.By;
-      const mag = Math.hypot(bx, by);
-      dummy.position.set(x, y, S.axis === 'xy' ? S.t / T_MAX + 0.005 : 0.505);
-      if (mag > maxMag * 0.05) {
-        const angle = Math.atan2(by, bx);
-        dummy.rotation.set(0, 0, angle);
-        const lengthScale = clamp(mag / maxMag * 2.0, 0.2, 2.5);
-        dummy.scale.set(lengthScale, lengthScale, 1.0);
-        const hue = 0.7 - clamp(mag / maxMag, 0, 1) * 0.7;
-        arrowMesh.setColorAt(idx, new THREE.Color().setHSL(hue, 1.0, 0.5));
-      } else {
-        dummy.scale.set(0, 0, 0);
-        arrowMesh.setColorAt(idx, new THREE.Color(0,0,0));
-      }
-      dummy.updateMatrix();
-      arrowMesh.setMatrixAt(idx, dummy.matrix);
-      idx++;
-    }
-  }
-  arrowMesh.count = idx;
-  arrowMesh.instanceMatrix.needsUpdate = true;
-  if(arrowMesh.instanceColor) arrowMesh.instanceColor.needsUpdate = true;
-}
-
-function updateStreamlines(dt) {
-  particleSystem.visible = S.showStream;
-  if (!S.showStream) return;
-  const positions = particleSystem.geometry.attributes.position.array;
-  const lifetimes = particleSystem.geometry.attributes.lifetime.array;
-  for(let i=0; i<particleCount; i++) {
-    lifetimes[i] -= dt * 0.5;
-    let x = positions[i*3], y = positions[i*3+1];
-    const field = fieldAt(x, y, S.t);
-    const speed = 0.5;
-    x += field.Bx * speed * dt;
-    y += field.By * speed * dt;
-    if (lifetimes[i] < 0 || x < 0 || x > 1 || y < 0 || y > 1) {
-      x = Math.random(); y = Math.random();
-      lifetimes[i] = 1.0;
-    }
-    positions[i*3] = x; positions[i*3+1] = y;
-    positions[i*3+2] = S.axis === 'xy' ? S.t / T_MAX + 0.01 : 0.51;
-  }
-  particleSystem.geometry.attributes.position.needsUpdate = true;
-}
-
-function analyticalSlice(N, axis, pos, t) {
-  const Ez = [], Bx = [], By = [];
-  const tWin = T_MAX / 2;
-  const t0 = Math.max(0, t - tWin / 2);
-  const t1 = Math.min(T_MAX, t + tWin / 2);
-  for (let j = 0; j < N; j++) {
-    const rE = [], rX = [], rY = [];
-    for (let i = 0; i < N; i++) {
-      let x, y, tt = t;
-      if (axis === 'xy') { x = i/(N-1); y = j/(N-1); }
-      else if (axis === 'xz') { x = i/(N-1); y = pos; tt = t0 + (j/(N-1)) * (t1 - t0); }
-      else { x = pos; y = j/(N-1); tt = t0 + (i/(N-1)) * (t1 - t0); }
-      const f = fieldAt(x, y, tt);
-      rE.push(f.Ez); rX.push(f.Bx); rY.push(f.By);
-    }
-    Ez.push(rE); Bx.push(rX); By.push(rY);
-  }
-  return { Ez, Bx, By };
-}
-
-function applySlice() {
-  if (!S.sliceData) return;
-  const N = S.resolution;
-  if (sliceArr.length !== N * N * 3) {
-    sliceArr = new Uint8Array(N * N * 3);
-    sliceTex = new THREE.DataTexture(sliceArr, N, N, THREE.RGBFormat);
-    sliceMesh.material.map = sliceTex;
-  }
-
-  let matrix = [];
-  let min = 0, max = 1;
-  const m = S.fieldMode;
-
-  for (let j = 0; j < N; j++) {
-    const row = [];
-    for (let i = 0; i < N; i++) {
-      const e = S.sliceData.Ez[j][i], x = S.sliceData.Bx[j][i], y = S.sliceData.By[j][i];
-      let val = 0;
-      if (m === 'ez') val = e;
-      else if (m === 'bmag') val = Math.hypot(x, y);
-      else val = 0.5*(e*e + x*x + y*y);
-      row.push(val);
-      if (val < min) min = val;
-      if (val > max) max = val;
-    }
-    matrix.push(row);
-  }
-
-  if (m === 'ez') { const s = Math.max(Math.abs(min), Math.abs(max)); min = -s; max = s; }
-  else { min = 0; }
-
-  for (let j = 0; j < N; j++) {
-    for (let i = 0; i < N; i++) {
-      const idx = (j * N + i) * 3;
-      let rgb = getColor(matrix[j][i], min, max, m === 'ez' ? divergeMap : infernoMap);
-
-      if (S.showContours) {
-        const val = matrix[j][i];
-        const normVal = (val - min) / (max - min || 1);
-        const numLevels = 8;
-        const levelVal = normVal * numLevels;
-        const roundLevel = Math.round(levelVal);
-        const dist = Math.abs(levelVal - roundLevel);
-        if (dist < 0.06) {
-          rgb = m === 'ez' ? [0, 0, 0] : [255, 255, 255];
-        }
-      }
-
-      sliceArr[idx] = rgb[0]; sliceArr[idx+1] = rgb[1]; sliceArr[idx+2] = rgb[2];
-    }
-  }
-  sliceTex.needsUpdate = true;
-
-  document.getElementById('cb-max').textContent = max.toFixed(2);
-  document.getElementById('cb-min').textContent = min.toFixed(2);
-  document.getElementById('cb-grad').style.background = m === 'ez'
-    ? 'linear-gradient(to top, #2166ac, #f7f7f7, #b2182b)'
-    : 'linear-gradient(to top, #000004, #de4968, #fcfdbf)';
-}
-
-let lastT = performance.now();
-function animate() {
-  requestAnimationFrame(animate);
-  const now = performance.now();
-  const dt = (now - lastT) / 1000;
-  lastT = now;
-
-  if (S.playing) {
-    S.t = (S.t + dt * S.speed) % T_MAX;
-    document.getElementById('v-t').textContent = S.t.toFixed(3) + ' s';
-    document.getElementById('sl-t').value = S.t;
-  }
-
-  updateData();
-  applyVectors();
-
-  sliceMesh.position.set(S.axis === 'yz' ? S.position : 0.5, S.axis === 'xz' ? S.position : 0.5, S.axis === 'xy' ? S.t / T_MAX : 0.5);
-  sliceMesh.rotation.set(S.axis === 'xz' ? -Math.PI/2 : 0, S.axis === 'yz' ? -Math.PI/2 : 0, 0);
-
-  updateStreamlines(dt);
-
-  ghostPoints.visible = S.showGhost;
-  boxLine.visible = S.showBox;
-  arrowMesh.visible = S.showVec;
-
-  if (boxHoverMesh) {
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(boxHoverMesh);
-    tooltip.style.display = (intersects.length > 0 && S.showBox) ? 'block' : 'none';
-  }
-
-  const activeStepIdx = Math.floor((S.t / T_MAX) * 5);
-  const steps = ['step-colloc', 'step-pinn', 'step-fields', 'step-pde', 'step-loss'];
-  steps.forEach((stepId, idx) => {
-    const el = document.getElementById(stepId);
-    if (el) {
-      if (idx === activeStepIdx) el.classList.add('step-active');
-      else el.classList.remove('step-active');
-    }
-  });
-
-  controls.update();
-  renderer.render(scene, camera);
-}
-
-document.getElementById('btn-play').onclick = e => { S.playing = !S.playing; e.target.textContent = S.playing ? 'Pausar Simulaci&oacute;n' : 'Reanudar'; };
-document.getElementById('sl-t').oninput = e => { S.t = parseFloat(e.target.value); document.getElementById('v-t').textContent = S.t.toFixed(3) + ' s'; S.fetchDirty = true; };
-document.getElementById('sl-sp').oninput = e => { S.speed = parseFloat(e.target.value); document.getElementById('v-sp').textContent = S.speed.toFixed(1) + 'x'; };
-document.getElementById('sl-eps').oninput = e => { S.eps_r = parseFloat(e.target.value); document.getElementById('v-eps').textContent = S.eps_r.toFixed(2); };
-document.getElementById('sl-mu').oninput = e => { S.mu_r = parseFloat(e.target.value); document.getElementById('v-mu').textContent = S.mu_r.toFixed(2); };
-document.getElementById('sl-freq').oninput = e => { S.freq_scale = parseFloat(e.target.value); document.getElementById('v-freq').textContent = S.freq_scale.toFixed(2) + 'x'; };
-document.getElementById('sl-sigma').oninput = e => { S.sigma_wall = parseFloat(e.target.value); document.getElementById('v-sigma').textContent = S.sigma_wall.toFixed(2); };
-document.getElementById('sl-res').oninput = e => { S.resolution = parseInt(e.target.value); document.getElementById('v-res').textContent = S.resolution; S.fetchDirty = true; };
-document.getElementById('sl-pos').oninput = e => { S.position = parseFloat(e.target.value); document.getElementById('v-pos').textContent = S.position.toFixed(2); S.fetchDirty = true; };
-document.getElementById('field-mode').onchange = e => { S.fieldMode = e.target.value; applySlice(); };
-
-function bindToggle(id, key, callback) {
-  const el = document.getElementById(id);
-  if (el) {
-    el.onclick = () => {
-      S[key] = !S[key];
-      el.classList.toggle('on', S[key]);
-      if (callback) callback(S[key]);
-    };
-  }
-}
-bindToggle('tog-stream', 'showStream');
-bindToggle('tog-vec', 'showVec');
-bindToggle('tog-ghost', 'showGhost');
-bindToggle('tog-box', 'showBox');
-bindToggle('tog-contours', 'showContours', () => applySlice());
-
-document.querySelectorAll('.seg-btn').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.seg-btn').forEach(x => x.classList.remove('active'));
-  b.classList.add('active');
-  S.axis = b.dataset.axis;
-  document.getElementById('pos-wrap').style.display = S.axis === 'xy' ? 'none' : 'block';
-  S.fetchDirty = true; updateData();
-});
-
-const heroPanel = document.getElementById('hero-panel');
-const btnHeroToggle = document.getElementById('btn-hero-toggle');
-if (heroPanel && btnHeroToggle) {
-  btnHeroToggle.onclick = () => {
-    heroPanel.classList.toggle('collapsed');
-    btnHeroToggle.innerHTML = heroPanel.classList.contains('collapsed') ? '&#9660;' : '&#9650;';
-  };
-}
-
-document.querySelectorAll('#hero-panel .tab-btn').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('#hero-panel .tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('#hero-panel .tab-pane').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    const tabId = btn.dataset.tab;
-    const pane = document.getElementById(tabId);
-    if (pane) pane.classList.add('active');
-  };
-});
-
-// ════════════════════════════════════════════
-// FASE 3 — COMPARACIÓN, DIAGNÓSTICO Y EXPORTACIÓN
-// ════════════════════════════════════════════
-
-function initComparisonPanel() {
-  const btn = document.getElementById('compare-toggle-btn');
-  const panel = document.getElementById('compare-panel');
-  if (!btn || !panel) return;
-
-  btn.onclick = () => {
-    panel.classList.toggle('visible');
-    btn.classList.toggle('active');
-    btn.textContent = panel.classList.contains('visible') ? '✕ Cerrar' : '📊 Comparar';
-    if (panel.classList.contains('visible')) fetchComparison();
-  };
-
-  document.querySelectorAll('#compare-panel .compare-tab').forEach(tab => {
-    tab.onclick = () => {
-      document.querySelectorAll('#compare-panel .compare-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('#compare-panel .compare-tab-content').forEach(c => c.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById(tab.dataset.ctab).classList.add('active');
-      const tabId = tab.dataset.ctab;
-      if (tabId === 'ctab-fields') fetchComparison();
-      else if (tabId === 'ctab-metrics') fetchMetrics();
-      else if (tabId === 'ctab-pde') fetchResiduals();
-      else if (tabId === 'ctab-bc') fetchBCValidation();
-    };
-  });
-}
-
-function toggleValidationFold(el) {
-  const section = el.parentElement;
-  const wasExpanded = section.classList.contains('expanded');
-  section.classList.toggle('expanded');
-  if (!wasExpanded && section.classList.contains('expanded')) {
-    fetchComparison();
-  }
-}
-
-async function fetchComparison() {
-  if (!S.usePINN) return;
-  try {
-    const res = await fetch(`${API}/api/compare/slice`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ N: 60, t: S.t, eps_r: S.eps_r, mu_r: S.mu_r })
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    renderComparisonCanvases(data);
-    renderComparisonSummary(data);
-  } catch (e) {
-    console.error('Comparison fetch failed:', e);
-  }
-}
-
-function renderComparisonCanvases(data) {
-  const N = data.N;
-  const pinnCanvas = document.getElementById('cmp-pinn');
-  const analCanvas = document.getElementById('cmp-analytical');
-  const errCanvas = document.getElementById('cmp-error');
-
-  if (!pinnCanvas || !analCanvas || !errCanvas) return;
-
-  const pinnCtx = pinnCanvas.getContext('2d');
-  const analCtx = analCanvas.getContext('2d');
-  const errCtx = errCanvas.getContext('2d');
-
-  pinnCanvas.width = N; pinnCanvas.height = N;
-  analCanvas.width = N; analCanvas.height = N;
-  errCanvas.width = N; errCanvas.height = N;
-  pinnCanvas.style.width = '100%'; pinnCanvas.style.height = '100%';
-  analCanvas.style.width = '100%'; analCanvas.style.height = '100%';
-  errCanvas.style.width = '100%'; errCanvas.style.height = '100%';
-
-  const pinn = data.Ez_pinn;
-  const anal = data.Ez_analytical;
-  const err = data.err_Ez;
-
-  let allMin = Infinity, allMax = -Infinity;
-  for (let j = 0; j < N; j++) {
-    for (let i = 0; i < N; i++) {
-      const v = pinn[j][i];
-      if (v < allMin) allMin = v;
-      if (v > allMax) allMax = v;
-      const va = anal[j][i];
-      if (va < allMin) allMin = va;
-      if (va > allMax) allMax = va;
-    }
-  }
-  const s = Math.max(Math.abs(allMin), Math.abs(allMax));
-  const errMax = Math.max(...err.flat()) || 1;
-
-  function drawField(ctx, data, min, max) {
-    const imgData = ctx.createImageData(N, N);
-    for (let j = 0; j < N; j++) {
-      for (let i = 0; i < N; i++) {
-        const idx = (j * N + i) * 4;
-        const v = data[j][i];
-        const t = clamp((v - min) / (max - min || 1), 0, 1);
-        if (v >= 0) {
-          imgData.data[idx] = 253; imgData.data[idx+1] = 219; imgData.data[idx+2] = 199;
-        } else {
-          imgData.data[idx] = 103; imgData.data[idx+1] = 169; imgData.data[idx+2] = 207;
-        }
-        const alpha = Math.abs(v) / (max || 1);
-        imgData.data[idx] = Math.round(imgData.data[idx] * alpha + 255 * (1 - alpha));
-        imgData.data[idx+1] = Math.round(imgData.data[idx+1] * alpha + 255 * (1 - alpha));
-        imgData.data[idx+2] = Math.round(imgData.data[idx+2] * alpha + 255 * (1 - alpha));
-        imgData.data[idx+3] = 255;
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
-  }
-
-  function drawError(ctx, data) {
-    const imgData = ctx.createImageData(N, N);
-    for (let j = 0; j < N; j++) {
-      for (let i = 0; i < N; i++) {
-        const idx = (j * N + i) * 4;
-        const t = clamp(data[j][i] / errMax, 0, 1);
-        imgData.data[idx] = Math.round(12 + 243 * t);
-        imgData.data[idx+1] = Math.round(0 + 128 * (1-t));
-        imgData.data[idx+2] = Math.round(36 + 80 * (1-t));
-        imgData.data[idx+3] = 255;
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
-  }
-
-  drawField(pinnCtx, pinn, -s, s);
-  drawField(analCtx, anal, -s, s);
-  drawError(errCtx, err);
-}
-
-function renderComparisonSummary(data) {
-  const m = data.metrics || {};
-  const el = document.getElementById('cmp-summary');
-  if (!el) return;
-
-  const l2ez = m.l2_Ez || 0;
-  const l2bx = m.l2_Bx || 0;
-  const l2by = m.l2_By || 0;
-  const avgL2 = (l2ez + l2bx + l2by) / 3;
-
-  const l2Class = (v) => v < 2 ? 'error-low' : (v < 10 ? 'error-mid' : 'error-high');
-
-  el.innerHTML = `
-    <div class="metric-card" style="margin-bottom:6px;width:100%;">
-      <div class="metric-label" style="font-size:9px;">Error L2 Promedio</div>
-      <div class="metric-value ${l2Class(avgL2)}" style="font-size:20px;">${avgL2.toFixed(2)}%</div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:6px;width:100%;">
-      <div><div class="metric-label" style="font-size:8px;">L2 Ez</div><div class="metric-value ${l2Class(l2ez)}" style="font-size:12px;">${l2ez.toFixed(2)}%</div></div>
-      <div><div class="metric-label" style="font-size:8px;">L2 Bx</div><div class="metric-value ${l2Class(l2bx)}" style="font-size:12px;">${l2bx.toFixed(2)}%</div></div>
-      <div><div class="metric-label" style="font-size:8px;">L2 By</div><div class="metric-value ${l2Class(l2by)}" style="font-size:12px;">${l2by.toFixed(2)}%</div></div>
-    </div>
-    <div style="margin-top:8px;font-size:7px;color:var(--text-muted);">
-      MSE Ez: ${(m.mse_Ez || 0).toExponential(2)} | Bx: ${(m.mse_Bx || 0).toExponential(2)} | By: ${(m.mse_By || 0).toExponential(2)}
-    </div>
-  `;
-}
-
-async function fetchMetrics() {
-  if (!S.usePINN) return;
-  const container = document.getElementById('metrics-container');
-  if (!container) return;
-  container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);font-size:11px;">Consultando...</div>';
-  try {
-    const res = await fetch(`${API}/api/compare/metrics`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ N: 50, t: S.t, eps_r: S.eps_r, mu_r: S.mu_r })
-    });
-    if (!res.ok) throw new Error('Failed');
-    const data = await res.json();
-    const l2 = data.l2 || {};
-    const mse = data.mse || {};
-    const pde = data.pde_residuals || {};
-    const ene = data.energy || {};
-
-    const l2Cls = (v) => v < 2 ? 'error-low' : (v < 10 ? 'error-mid' : 'error-high');
-
-    container.innerHTML = `
-      <div style="margin-bottom:8px;">
-        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Error L2 Relativo (%)</div>
-        <div class="metrics-grid">
-          <div class="metric-card"><div class="metric-label">Ez</div><div class="metric-value ${l2Cls(l2.Ez)}" style="font-size:13px;">${(l2.Ez||0).toFixed(2)}%</div></div>
-          <div class="metric-card"><div class="metric-label">Bx</div><div class="metric-value ${l2Cls(l2.Bx)}" style="font-size:13px;">${(l2.Bx||0).toFixed(2)}%</div></div>
-          <div class="metric-card"><div class="metric-label">By</div><div class="metric-value ${l2Cls(l2.By)}" style="font-size:13px;">${(l2.By||0).toFixed(2)}%</div></div>
-          <div class="metric-card"><div class="metric-label">Promedio</div><div class="metric-value ${l2Cls(l2.average)}" style="font-size:13px;">${(l2.average||0).toFixed(2)}%</div></div>
-        </div>
-      </div>
-      <div style="margin-bottom:8px;">
-        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Error Cuadr&aacute;tico Medio (MSE)</div>
-        <div class="metrics-grid">
-          <div class="metric-card"><div class="metric-label">Ez</div><div class="metric-value" style="font-size:10px;color:var(--text);">${(mse.Ez||0).toExponential(3)}</div></div>
-          <div class="metric-card"><div class="metric-label">Bx</div><div class="metric-value" style="font-size:10px;color:var(--text);">${(mse.Bx||0).toExponential(3)}</div></div>
-          <div class="metric-card"><div class="metric-label">By</div><div class="metric-value" style="font-size:10px;color:var(--text);">${(mse.By||0).toExponential(3)}</div></div>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Energ&iacute;a</div>
-        <div class="metrics-grid">
-          <div class="metric-card"><div class="metric-label">Media</div><div class="metric-value" style="font-size:10px;color:var(--text);">${(ene.mean||0).toExponential(3)}</div></div>
-          <div class="metric-card"><div class="metric-label">Conservaci&oacute;n</div><div class="metric-value ${(ene.conservation_pct||100) < 5 ? 'error-low' : 'error-high'}" style="font-size:10px;">${(ene.conservation_pct||0).toFixed(2)}%</div></div>
-        </div>
-      </div>
-    `;
-  } catch (e) {
-    container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--error);font-size:10px;">Error al obtener m&eacute;tricas. &iquest;Servidor activo?</div>';
-  }
-}
-
-async function fetchResiduals() {
-  if (!S.usePINN) return;
-  const container = document.getElementById('pde-residuals-container');
-  if (!container) return;
-  container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);font-size:11px;">Consultando...</div>';
-  try {
-    const res = await fetch(`${API}/residuals`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ t: S.t, N: 15, eps_r: S.eps_r, mu_r: S.mu_r })
-    });
-    if (!res.ok) throw new Error('Failed');
-    const data = await res.json();
-
-    const order = [
-      { key: 'faraday_x', label: 'Faraday X' },
-      { key: 'faraday_y', label: 'Faraday Y' },
-      { key: 'ampere', label: 'Amp&egrave;re' },
-      { key: 'gauss_b', label: 'Gauss B' }
-    ];
-
-    const maxVal = Math.max(...order.map(o => data[o.key] || 0), 1e-10);
-
-    container.innerHTML = `
-      <div class="pde-res-grid">
-        ${order.map(o => {
-          const val = data[o.key] || 0;
-          const pct = Math.min(100, (val / maxVal) * 100);
-          const cls = val < 1e-3 ? 'var(--success)' : (val < 1e-2 ? 'var(--warning)' : 'var(--error)');
-          return `
-            <div class="pde-res-item">
-              <div style="display:flex;justify-content:space-between;">
-                <span class="res-label">${o.label}</span>
-                <span class="res-value" style="color:${cls}">${val.toExponential(2)}</span>
-              </div>
-              <div class="pde-res-bar"><div class="pde-res-fill" style="width:${pct}%;background:${cls};"></div></div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-      <div style="margin-top:8px;font-size:8px;color:var(--text-muted);">
-        Total MSE: ${(data.total_mse || 0).toExponential(2)} |
-        Objetivo: &lt; 1e-3 por ecuaci&oacute;n
-      </div>
-    `;
-  } catch (e) {
-    container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--error);font-size:10px;">Error al obtener residuales.</div>';
-  }
-}
-
-async function fetchBCValidation() {
-  if (!S.usePINN) return;
-  const container = document.getElementById('bc-validation-container');
-  if (!container) return;
-  container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);font-size:11px;">Validando...</div>';
-  try {
-    const res = await fetch(`${API}/api/validate/boundary?N_per_side=100`);
-    if (!res.ok) throw new Error('Failed');
-    const data = await res.json();
-    const sideNames = { left: 'Izquierda (x=0)', right: 'Derecha (x=L)', bottom: 'Inferior (y=0)', top: 'Superior (y=L)' };
-    container.innerHTML = `
-      <div style="margin-bottom:8px;">
-        <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">
-          Error Global | Media: <b style="color:${data.global_mean < 1e-3 ? 'var(--success)' : 'var(--error)'}">${data.global_mean.toExponential(2)}</b>
-          | M&aacute;x: <b style="color:${data.global_max < 1e-2 ? 'var(--success)' : 'var(--error)'}">${data.global_max.toExponential(2)}</b>
-          | Violaci&oacute;n PEC: <b style="color:${data.pec_violation_pct < 5 ? 'var(--success)' : 'var(--error)'}">${data.pec_violation_pct.toFixed(1)}%</b>
-        </div>
-      </div>
-      <div class="pde-res-grid">
-        ${Object.entries(sideNames).map(([key, label]) => {
-          const side = data.sides[key];
-          if (!side) return '';
-          const cls = side.mean < 1e-3 ? 'var(--success)' : (side.mean < 1e-2 ? 'var(--warning)' : 'var(--error)');
-          return `
-            <div class="pde-res-item">
-              <div style="display:flex;justify-content:space-between;">
-                <span class="res-label">${label}</span>
-                <span class="res-value" style="color:${cls};font-size:10px;">&mu;=${side.mean.toExponential(2)}</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--text-muted);">
-                <span>m&aacute;x: ${side.max.toExponential(2)}</span>
-                <span>&sigma;: ${side.std.toExponential(2)}</span>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-      <div style="margin-top:8px;font-size:8px;color:var(--text-muted);">
-        Condici&oacute;n PEC: Ez = 0 en todas las paredes. La red debe satisfacer esta restricci&oacute;n f&iacute;sica.
-      </div>
-    `;
-  } catch (e) {
-    container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--error);font-size:10px;">Error en validaci&oacute;n de bordes.</div>';
-  }
-}
-
-let diagChartCache = null;
-
-async function fetchTrainingHistory() {
-  const panel = document.getElementById('diag-panel');
-  if (!panel || !panel.classList.contains('visible')) return;
-  try {
-    const res = await fetch(`${API}/api/training/history`);
-    if (!res.ok) throw new Error('Failed');
-    const data = await res.json();
-    diagChartCache = data;
-    renderDiagnosticCharts(data);
-    renderDiagnosticParams(data);
-  } catch (e) {
-    console.error('Diagnostics fetch failed:', e);
-  }
-}
-
-function renderDiagnosticCharts(data) {
-  const hist = data.history || [];
-  if (!hist.length) return;
-  const lossCanvas = document.getElementById('diag-loss');
-  const resCanvas = document.getElementById('diag-residual');
-  if (!lossCanvas || !resCanvas) return;
-  const dpr = Math.min(window.devicePixelRatio, 2);
-  lossCanvas.width = lossCanvas.clientWidth * dpr * 2;
-  lossCanvas.height = lossCanvas.clientHeight * dpr;
-  resCanvas.width = resCanvas.clientWidth * dpr * 2;
-  resCanvas.height = resCanvas.clientHeight * dpr;
-  const lCtx = lossCanvas.getContext('2d');
-  const rCtx = resCanvas.getContext('2d');
-  const W = lossCanvas.width;
-  const H = lossCanvas.height;
-
-  function drawLossChart(ctx) {
-    ctx.clearRect(0, 0, W, H);
-    const epochs = hist.map(h => h.epoch);
-    const totals = hist.map(h => h.loss_total || 1e-10);
-    const pdes = hist.map(h => h.loss_pde || 1e-10);
-    const bcs = hist.map(h => h.loss_bc || 1e-10);
-    const ics = hist.map(h => h.loss_ic || 1e-10);
-    const allVals = [...totals, ...pdes, ...bcs, ...ics].filter(v => v > 0);
-    if (!allVals.length) return;
-    const yMin = Math.min(...allVals);
-    const yMax = Math.max(...allVals);
-    const padL = 35 * dpr, padR = 10 * dpr, padT = 15 * dpr, padB = 20 * dpr;
-    const plotW = W - padL - padR;
-    const plotH = H - padT - padB;
-    function xPos(e) { return padL + (e - epochs[0]) / (epochs[epochs.length-1] - epochs[0] || 1) * plotW; }
-    function yPos(v) { return padT + plotH - (Math.log10(v) - Math.log10(yMin)) / (Math.log10(yMax) - Math.log10(yMin) || 1) * plotH; }
-    ctx.strokeStyle = 'rgba(0,0,0,0.04)';
-    ctx.lineWidth = 1;
-    for (let i = 1; i < 5; i++) {
-      const y = padT + plotH * (i / 5);
-      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-    }
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.font = `${8 * dpr}px monospace`;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    for (let i = 0; i <= 4; i++) {
-      const t = i / 4;
-      const val = Math.pow(10, Math.log10(yMin) + t * (Math.log10(yMax) - Math.log10(yMin)));
-      ctx.fillText(val.toExponential(0), padL - 4 * dpr, padT + plotH * (1 - t));
-    }
-    function drawLine(data, color) {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.5 * dpr;
-      ctx.beginPath();
-      for (let i = 0; i < data.length; i++) {
-        const x = xPos(epochs[i]), y = yPos(data[i]);
-        if (y >= padT && y <= padT + plotH) {
-          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-      }
-      ctx.stroke();
-    }
-    drawLine(totals, 'rgba(26,29,35,0.8)');
-    drawLine(pdes, 'rgba(74,111,165,0.7)');
-    drawLine(bcs, 'rgba(217,74,74,0.6)');
-    drawLine(ics, 'rgba(29,158,117,0.6)');
-    ctx.font = `${7 * dpr}px sans-serif`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    const legendItems = [
-      { label: 'Total', color: 'rgba(26,29,35,0.8)' },
-      { label: 'PDE', color: 'rgba(74,111,165,0.7)' },
-      { label: 'BC', color: 'rgba(217,74,74,0.6)' },
-      { label: 'IC', color: 'rgba(29,158,117,0.6)' }
-    ];
-    const legX = padL + 5 * dpr;
-    const legY = padT + 5 * dpr;
-    legendItems.forEach((item, i) => {
-      const lx = legX + (i % 2) * 65 * dpr;
-      const ly = legY + Math.floor(i / 2) * 12 * dpr;
-      ctx.fillStyle = item.color;
-      ctx.fillRect(lx, ly, 8 * dpr, 8 * dpr);
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.fillText(item.label, lx + 10 * dpr, ly);
-    });
-  }
-
-  function drawResidualChart(ctx) {
-    ctx.clearRect(0, 0, W, H);
-    ctx.font = `${9 * dpr}px sans-serif`;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('&Eacute;pocas vs P&eacute;rdida (escala log)', W/2, H/2);
-  }
-
-  drawLossChart(lCtx);
-  drawResidualChart(rCtx);
-}
-
-function renderDiagnosticParams(data) {
-  const el = document.getElementById('diag-params');
-  if (!el) return;
-  const p = data.params || {};
-  el.innerHTML = `
-    <div style="margin-bottom:6px;"><b style="color:var(--accent);">Arquitectura</b></div>
-    <div>FCN ${p.arch || '[3,128,128,128,128,3]'}</div>
-    <div style="margin-top:4px;">Par&aacute;metros: <b>${(p.n_params || 58243).toLocaleString()}</b></div>
-    <div style="margin-top:4px;">Fourier: ${p.fourier ? '✅' : '❌'} (N=${p.n_fourier||32}, &sigma;=${p.sigma||1.5})</div>
-    <div style="margin-top:4px;">Optimizaci&oacute;n: Adam → L-BFGS</div>
-    <div style="margin-top:4px;">Warm-up: 8000 &eacute;pocas (&lambda;=100)</div>
-    <div style="margin-top:4px;">LR: CosineAnnealingWarmRestarts</div>
-  `;
-}
-
-let diagToggleInterval = null;
-
-function initDiagnostics() {
-  const btn = document.createElement('button');
-  btn.id = 'diag-toggle-btn';
-  btn.textContent = '📈 Diagn&oacute;stico';
-  document.body.appendChild(btn);
-
-  const panel = document.getElementById('diag-panel');
-
-  btn.onclick = () => {
-    panel.classList.toggle('visible');
-    btn.textContent = panel.classList.contains('visible') ? '✕ Cerrar' : '📈 Diagn&oacute;stico';
-    if (panel.classList.contains('visible')) {
-      fetchTrainingHistory();
-      if (diagToggleInterval) clearInterval(diagToggleInterval);
-      diagToggleInterval = setInterval(fetchTrainingHistory, 5000);
-    } else {
-      if (diagToggleInterval) { clearInterval(diagToggleInterval); diagToggleInterval = null; }
-    }
-  };
-}
-
-async function runBenchmark() {
-  const status = document.getElementById('export-status');
-  status.textContent = 'Ejecutando benchmark...';
-  try {
-    const res = await fetch(`${API}/api/benchmark`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ N: 40 })
-    });
-    if (!res.ok) throw new Error('Failed');
-    const data = await res.json();
-    const bench = data.benchmark || [];
-    let report = 'PINN Benchmark\n-------------\n';
-    bench.forEach(b => {
-      report += `\nBatch ${b.batch_size}: ${b.pinn_time_ms.toFixed(2)}ms (${b.pinn_pts_per_sec.toLocaleString()} pts/s)\n`;
-      report += `  vs FDTD 50×50: ~${(b.fdtd_comparison?.['50x50']?.time_per_step_ms || 0).toFixed(1)}ms/step\n`;
-    });
-    console.log(report);
-    status.textContent = '✅ Benchmark completado (ver consola)';
-  } catch (e) {
-    status.textContent = 'Error en benchmark';
-  }
-  setTimeout(() => { if (status) status.textContent = ''; }, 3000);
-}
-
-function initSimulationModes() {
-  const modeSelect = document.getElementById('sim-mode');
-  const modelSelect = document.getElementById('model-selector');
-
-  modeSelect.onchange = () => {
-    const mode = modeSelect.value;
-    const statusEl = document.getElementById('export-status');
-    if (statusEl) statusEl.textContent = `Modo: ${modeSelect.options[modeSelect.selectedIndex].text}`;
-  };
-
-  modelSelect.onchange = () => {
-    const model = modelSelect.value;
-    if (model === 'comparison') {
-      const panel = document.getElementById('compare-panel');
-      const btn = document.getElementById('compare-toggle-btn');
-      if (panel && btn) {
-        panel.classList.add('visible');
-        btn.classList.add('active');
-        btn.textContent = '✕ Cerrar';
-      }
-      fetchComparison();
-    } else if (model === 'pinn') {
-      S.usePINN = true;
-      updateBadge();
-    } else if (model === 'analytical') {
-      S.usePINN = false;
-      updateBadge();
-    } else {
-      checkAPI();
-    }
-  };
-
-  modeSelect.dispatchEvent(new Event('change'));
-}
-
-function initExport() {
-  const pngBtn = document.getElementById('export-png');
-  const csvBtn = document.getElementById('export-csv');
-  const jsonBtn = document.getElementById('export-json');
-  const configBtn = document.getElementById('export-config');
-  const benchBtn = document.getElementById('btn-benchmark');
-  if (pngBtn) pngBtn.onclick = exportPNG;
-  if (csvBtn) csvBtn.onclick = () => exportData('csv');
-  if (jsonBtn) jsonBtn.onclick = () => exportData('json');
-  if (configBtn) configBtn.onclick = exportConfig;
-  if (benchBtn) benchBtn.onclick = runBenchmark;
-}
-
-async function exportPNG() {
-  const status = document.getElementById('export-status');
-  status.textContent = 'Capturando...';
-  const canvas = document.getElementById('c');
-  if (!canvas) { status.textContent = 'Error: canvas no encontrado'; return; }
-  const link = document.createElement('a');
-  link.download = `maxwell_pinn_${S.t.toFixed(2)}s.png`;
-  try {
-    const dataUrl = canvas.toDataURL('image/png');
-    link.href = dataUrl;
-    link.click();
-    status.textContent = '✅ PNG exportado';
-  } catch (e) {
-    status.textContent = 'Error al exportar PNG';
-  }
-  setTimeout(() => { if (status) status.textContent = ''; }, 3000);
-}
-
-async function exportData(format) {
-  const status = document.getElementById('export-status');
-  status.textContent = `Exportando ${format.toUpperCase()}...`;
-  try {
-    const res = await fetch(`${API}/api/export/field`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ format: format, t: S.t, N: 50, eps_r: S.eps_r, mu_r: S.mu_r })
-    });
-    if (!res.ok) throw new Error('Export failed');
-    if (format === 'csv') {
-      const blob = await res.blob();
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `maxwell_fields_t${S.t.toFixed(3)}.csv`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    } else {
-      const data = await res.json();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `maxwell_fields_t${S.t.toFixed(3)}.json`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    }
-    status.textContent = `✅ ${format.toUpperCase()} exportado`;
-  } catch (e) {
-    status.textContent = `Error exportando ${format}`;
-  }
-  setTimeout(() => { if (status) status.textContent = ''; }, 3000);
-}
-
-async function exportConfig() {
-  const status = document.getElementById('export-status');
-  status.textContent = 'Exportando config...';
-  try {
-    const res = await fetch(`${API}/api/export/config`);
-    const data = await res.json();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'maxwell_config.json';
-    link.click();
-    URL.revokeObjectURL(link.href);
-    status.textContent = '✅ Config exportada';
-  } catch (e) {
-    status.textContent = 'Error exportando config';
-  }
-  setTimeout(() => { if (status) status.textContent = ''; }, 3000);
-}
-
-const originalUpdateData = updateData;
-updateData = function() {
-  originalUpdateData();
-  const comparePanel = document.getElementById('compare-panel');
-  if (comparePanel && comparePanel.classList.contains('visible')) {
-    const activeTab = document.querySelector('#compare-panel .compare-tab.active');
-    if (activeTab) {
-      const tabId = activeTab.dataset.ctab;
-      if (tabId === 'ctab-fields') fetchComparison();
-    }
-  }
-  const foldSection = document.querySelector('.fold-section');
-  if (foldSection && foldSection.classList.contains('expanded')) {
-    fetchComparison();
-  }
-};
-
-initComparisonPanel();
-initDiagnostics();
-initSimulationModes();
-initExport();
-
-checkAPI();
-animate();
-</script>
+  <p class="muted">El entrenamiento corre en el servidor; las pérdidas se grafican en vivo.</p>
+  <div class="dlg-actions">
+    <button class="btn-secondary" data-close>Cancelar</button>
+    <button class="btn-primary" id="tr-go">Iniciar entrenamiento</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-mesh">
+  <h3>Generador de malla</h3>
+  <div class="form-grid">
+    <label>Modo m <input type="number" id="mesh-m" value="1" min="1" max="5"></label>
+    <label>Modo n <input type="number" id="mesh-n" value="1" min="1" max="5"></label>
+    <label>Puntos por longitud de onda <input type="number" id="mesh-ppw" value="20" min="6" max="200"></label>
+    <label>Courant S <input type="number" id="mesh-courant" value="0.5" step="0.05" min="0.1" max="0.7"></label>
+  </div>
+  <pre id="mesh-out" class="tool-out">—</pre>
+  <div class="dlg-actions">
+    <button class="btn-secondary" data-close>Cerrar</button>
+    <button class="btn-secondary" id="mesh-calc">Calcular</button>
+    <button class="btn-primary" id="mesh-apply">Aplicar al dominio</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-refine">
+  <h3>Refinamiento adaptativo</h3>
+  <p class="muted">Estudio de convergencia por extrapolación de Richardson: se corre FDTD a
+  resoluciones crecientes hasta alcanzar el error objetivo.</p>
+  <div class="form-grid">
+    <label>Error objetivo (%) <input type="number" id="refine-target" value="0.05" step="0.01" min="0.001"></label>
+  </div>
+  <pre id="refine-out" class="tool-out">—</pre>
+  <div class="dlg-actions">
+    <button class="btn-secondary" data-close>Cerrar</button>
+    <button class="btn-secondary" id="refine-run">Ejecutar estudio</button>
+    <button class="btn-primary" id="refine-apply" disabled>Aplicar Nx recomendado</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-materials">
+  <h3>Inspector de materiales</h3>
+  <table id="mat-table">
+    <thead><tr><th></th><th>Nombre</th><th>ε_r</th><th>μ_r</th><th>σ</th><th>Modelo</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="dlg-actions">
+    <button class="btn-secondary" data-close>Cerrar</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-gpu">
+  <h3>Configuración GPU / Cómputo</h3>
+  <pre id="gpu-out" class="tool-out">—</pre>
+  <div class="form-grid">
+    <label>Hilos de PyTorch <input type="number" id="gpu-threads" min="1" max="64" value="4"></label>
+  </div>
+  <div class="dlg-actions">
+    <button class="btn-secondary" data-close>Cerrar</button>
+    <button class="btn-primary" id="gpu-apply">Aplicar</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-help" class="dlg-wide">
+  <h3 id="help-title">Ayuda</h3>
+  <div id="help-body" class="help-body"></div>
+  <div class="dlg-actions">
+    <button class="btn-primary" data-close>Cerrar</button>
+  </div>
+</dialog>
+
+<input type="file" id="file-open-input" accept=".json,.fluxia" hidden>
+
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
