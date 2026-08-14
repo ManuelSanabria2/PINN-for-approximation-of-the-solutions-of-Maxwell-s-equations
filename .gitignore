@@ -8,3 +8,13 @@ __pycache__/
 
 # Ignore log files
 *.log
+
+# Persistencia server-side de Fluxia (SQLite + resultados .npz), generada en runtime
+pinn-maxwell/data/
+
+# Checkpoint escrito por el entrenador en vivo (/api/train); el modelo que carga
+# el servidor es maxwell_pinn.pth, no este
+pinn-maxwell/results/maxwell_pinn_live.pth
+
+# Grafo de conocimiento generado por graphify
+graphify-out/

@@ -36,6 +36,7 @@ from analytical import Ez_exact, Bx_exact, By_exact, cavity_mode
 from fdtd import FDTDConfig, FDTDSolver
 import comparison as cmp_mod
 import exporters
+import store
 
 # ─── Parámetros de arquitectura del PINN (coinciden con el entrenamiento) ────
 ARCH    = [3, 128, 128, 128, 128, 3]
@@ -114,6 +115,10 @@ def _pinn_meta():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    store.init_db()
+    store.reconcile_startup()
+    log(f"Persistencia en: {store.data_dir()}")
+    log(f"CORS — orígenes cruzados permitidos: {_CORS_ORIGINS or '(ninguno; solo same-origin)'}")
     try:
         _load_model()
     except Exception as exc:
@@ -122,8 +127,18 @@ async def lifespan(app: FastAPI):
     log("UI disponible en http://localhost:8000/demo")
     yield
 
+# El frontend (demo/js/api.js: BASE = "") es same-origin — no depende de CORS
+# para funcionar. Un allow_origins=["*"] sin auth deja que CUALQUIER sitio web
+# que un visitante tenga abierto haga que su navegador dispare requests contra
+# este servidor (lanzar entrenamientos, cancelar jobs, cambiar hilos de
+# PyTorch) sin que se entere. Por defecto no se permite ningún origen cruzado;
+# FLUXIA_CORS_ORIGINS permite habilitar orígenes específicos (coma-separados)
+# si se quiere consumir la API desde un dashboard/frontend separado.
+_CORS_ORIGINS = [o.strip() for o in
+                 os.environ.get("FLUXIA_CORS_ORIGINS", "").split(",") if o.strip()]
+
 app = FastAPI(title=APP_NAME, version=APP_VERSION, lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"],
+app.add_middleware(CORSMiddleware, allow_origins=_CORS_ORIGINS,
                    allow_methods=["*"], allow_headers=["*"])
 
 _demo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo")
@@ -226,41 +241,38 @@ def project_to_fdtd_config(project: dict) -> FDTDConfig:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# SISTEMA DE JOBS Y ALMACÉN DE RESULTADOS
+# SISTEMA DE JOBS Y ALMACÉN DE RESULTADOS (persistidos vía store.py)
 # ═════════════════════════════════════════════════════════════════════════════
-JOBS: dict[str, dict] = {}
-RESULTS: dict[str, dict] = {}
-_MAX_RESULTS = 4
+# Fast-path de cancelación: los callbacks de progreso de FDTD/PINN/entrenamiento
+# se llaman cientos/miles de veces por simulación, así que no pueden pagar un
+# round-trip a SQLite por paso. No necesita sobrevivir a un reinicio: un job
+# interrumpido por caída del proceso ya queda marcado "interrupted" al arrancar
+# (store.reconcile_startup).
+_cancel_flags: dict[str, bool] = {}
 
 def _store_result(res: dict) -> str:
-    rid = uuid.uuid4().hex[:12]
-    RESULTS[rid] = res
-    while len(RESULTS) > _MAX_RESULTS:
-        RESULTS.pop(next(iter(RESULTS)))
-    return rid
+    return store.result_store(res)
 
-def _run_job(job_id: str, target, *args):
-    job = JOBS[job_id]
+def _run_job(job_id: str, jtype: str, target, *args):
     try:
-        job["status"] = "running"
-        emit("job", job=job_id, status="running", jtype=job["type"])
+        store.job_set_status(job_id, "running")
+        emit("job", job=job_id, status="running", jtype=jtype)
         rid = target(job_id, *args)
-        job["status"] = "done"
-        job["result_id"] = rid
-        emit("job", job=job_id, status="done", jtype=job["type"], result_id=rid)
+        store.job_set_status(job_id, "done", result_id=rid)
+        emit("job", job=job_id, status="done", jtype=jtype, result_id=rid)
     except Exception as exc:
         import traceback; traceback.print_exc()
-        job["status"] = "error"
-        job["error"] = str(exc)
-        log(f"Job {job['type']} falló: {exc}", "error", job=job_id)
-        emit("job", job=job_id, status="error", jtype=job["type"], error=str(exc))
+        store.job_set_status(job_id, "error", error=str(exc))
+        log(f"Job {jtype} falló: {exc}", "error", job=job_id)
+        emit("job", job=job_id, status="error", jtype=jtype, error=str(exc))
+    finally:
+        _cancel_flags.pop(job_id, None)
 
 def _launch(jtype: str, target, *args) -> str:
     job_id = uuid.uuid4().hex[:10]
-    JOBS[job_id] = {"id": job_id, "type": jtype, "status": "queued",
-                    "cancel": False, "result_id": None, "error": None,
-                    "created": time.time()}
-    threading.Thread(target=_run_job, args=(job_id, target) + args,
+    store.job_create(job_id, jtype)
+    _cancel_flags[job_id] = False
+    threading.Thread(target=_run_job, args=(job_id, jtype, target) + args,
                      daemon=True).start()
     return job_id
 
@@ -286,7 +298,7 @@ def _target_fdtd(job_id: str, project: dict) -> str:
     lg("Compilando geometría y materiales…")
     lg(f"Generando malla {cfg.Nx}×{cfg.Ny}  (dx={cfg.dx:.4f}, CFL dt={cfg.dt:.5f})")
     res = cmp_mod.compare(cfg, None, log=lg,
-                          cancel_cb=lambda: JOBS[job_id]["cancel"])
+                          cancel_cb=lambda: _cancel_flags.get(job_id, False))
     lg("Guardando resultados FDTD…")
     res["mode"] = "fdtd"
     res["project"] = project
@@ -301,7 +313,7 @@ def _target_pinn(job_id: str, project: dict) -> str:
     Ez_p, Bx_p, By_p, wall = cmp_mod.eval_pinn_on_grid(
         _infer, cfg.Nx, cfg.Ny, cfg.L, times,
         eps_r=cfg.eps_r_bg, mu_r=cfg.mu_r_bg,
-        progress_cb=lambda k, K: (JOBS[job_id]["cancel"] or
+        progress_cb=lambda k, K: (_cancel_flags.get(job_id, False) or
                                   (k % max(1, K // 10) == 0 and lg(f"[PINN] instante {k}/{K}"))))
     energy = cmp_mod.energy_series(Ez_p, Bx_p, By_p, cfg.dx, cfg.dy)
     probe_t, probes = _pinn_probe_series(cfg)
@@ -327,7 +339,7 @@ def _target_both(job_id: str, project: dict) -> str:
     lg(f"Generando malla {cfg.Nx}×{cfg.Ny}…")
     lg("Inicializando PINN…")
     res = cmp_mod.compare(cfg, _infer, pinn_meta=_pinn_meta(), log=lg,
-                          cancel_cb=lambda: JOBS[job_id]["cancel"])
+                          cancel_cb=lambda: _cancel_flags.get(job_id, False))
     lg("Comparando con FDTD…")
     probe_t, probes = _pinn_probe_series(cfg)
     res.setdefault("pinn", {})["probe_t"] = probe_t
@@ -339,7 +351,12 @@ def _target_both(job_id: str, project: dict) -> str:
 
 
 # ─── Entrenamiento PINN en vivo ──────────────────────────────────────────────
+# _train_lock evita que dos POST /api/train concurrentes pasen ambos el chequeo
+# "active" antes de que el hilo en background alcance a marcarlo (TOCTOU): el
+# endpoint marca active=True de forma sincrónica, con el lock, antes de lanzar
+# el job — ver api_train().
 _TRAIN = {"active": False, "cancel": False}
+_train_lock = threading.Lock()
 
 def _target_train(job_id: str, opts: dict) -> str:
     from physics import total_loss
@@ -355,78 +372,81 @@ def _target_train(job_id: str, opts: dict) -> str:
     save     = bool(opts.get("save", True))
 
     lg = _job_log(job_id)
-    _TRAIN["active"] = True
-    _TRAIN["cancel"] = False
+    # _TRAIN["active"]/["cancel"] ya fueron marcados de forma atómica por
+    # api_train() antes de lanzar este job — no se tocan acá salvo para
+    # liberarlos en el finally, así un crash a mitad de entrenamiento no deja
+    # el flag trabado en True para siempre.
+    try:
+        global _model
+        with _model_lock:
+            if reset or _model is None:
+                torch.manual_seed(42)
+                model = FCN(ARCH, fourier_features=FOURIER, n_fourier=N_F, sigma=SIGMA).to(_device)
+                lg("Modelo reinicializado (Xavier)")
+            else:
+                model = _model
+            model.train()
 
-    global _model
-    with _model_lock:
-        if reset or _model is None:
-            torch.manual_seed(42)
-            model = FCN(ARCH, fourier_features=FOURIER, n_fourier=N_F, sigma=SIGMA).to(_device)
-            lg("Modelo reinicializado (Xavier)")
-        else:
-            model = _model
-        model.train()
+        opt = torch.optim.Adam(model.parameters(), lr=lr)
+        sched = torch.optim.lr_scheduler.ExponentialLR(opt, gamma=0.9998)
 
-    opt = torch.optim.Adam(model.parameters(), lr=lr)
-    sched = torch.optim.lr_scheduler.ExponentialLR(opt, gamma=0.9998)
+        lg(f"Entrenando: {epochs} épocas, lr={lr}, colocación={n_col}, BC={n_bc}×4, IC={n_ic}")
+        x_c, y_c, t_c = sample_interior(N=n_col, device=_device)
+        bp = sample_boundary(N_per_side=n_bc, device=_device)
+        x_i, y_i, t_i = sample_initial(N=n_ic, device=_device)
 
-    lg(f"Entrenando: {epochs} épocas, lr={lr}, colocación={n_col}, BC={n_bc}×4, IC={n_ic}")
-    x_c, y_c, t_c = sample_interior(N=n_col, device=_device)
-    bp = sample_boundary(N_per_side=n_bc, device=_device)
-    x_i, y_i, t_i = sample_initial(N=n_ic, device=_device)
+        t0 = time.perf_counter()
+        hist = {"epoch": [], "loss_total": [], "loss_pde": [], "loss_bc": [],
+                "loss_ic": [], "lr": [], "elapsed": []}
 
-    t0 = time.perf_counter()
-    hist = {"epoch": [], "loss_total": [], "loss_pde": [], "loss_bc": [],
-            "loss_ic": [], "lr": [], "elapsed": []}
+        for ep in range(1, epochs + 1):
+            if _TRAIN["cancel"] or _cancel_flags.get(job_id, False):
+                lg(f"Entrenamiento cancelado en época {ep}")
+                break
+            if ep % resample == 0:
+                x_c, y_c, t_c = sample_interior(N=n_col, device=_device)
+                bp = sample_boundary(N_per_side=n_bc, device=_device)
+                x_i, y_i, t_i = sample_initial(N=n_ic, device=_device)
 
-    for ep in range(1, epochs + 1):
-        if _TRAIN["cancel"] or JOBS[job_id]["cancel"]:
-            lg(f"Entrenamiento cancelado en época {ep}")
-            break
-        if ep % resample == 0:
-            x_c, y_c, t_c = sample_interior(N=n_col, device=_device)
-            bp = sample_boundary(N_per_side=n_bc, device=_device)
-            x_i, y_i, t_i = sample_initial(N=n_ic, device=_device)
+            opt.zero_grad()
+            L_t, L_p, L_b, L_i, _ = total_loss(model, x_c, y_c, t_c, bp, x_i, y_i, t_i)
+            L_t.backward()
+            opt.step()
+            sched.step()
 
-        opt.zero_grad()
-        L_t, L_p, L_b, L_i, _ = total_loss(model, x_c, y_c, t_c, bp, x_i, y_i, t_i)
-        L_t.backward()
-        opt.step()
-        sched.step()
+            if ep % max(1, min(20, epochs // 100 or 1)) == 0 or ep == 1 or ep == epochs:
+                el = time.perf_counter() - t0
+                cur_lr = opt.param_groups[0]["lr"]
+                emit("train", job=job_id, epoch=ep, epochs=epochs,
+                     loss_total=float(L_t), loss_pde=float(L_p),
+                     loss_bc=float(L_b), loss_ic=float(L_i),
+                     lr=float(cur_lr), elapsed=el)
+                hist["epoch"].append(ep)
+                hist["loss_total"].append(float(L_t))
+                hist["loss_pde"].append(float(L_p))
+                hist["loss_bc"].append(float(L_b))
+                hist["loss_ic"].append(float(L_i))
+                hist["lr"].append(float(cur_lr))
+                hist["elapsed"].append(el)
+            if ep % 100 == 0:
+                lg(f"Epoch {ep}/{epochs}  Total={float(L_t):.3e}  PDE={float(L_p):.3e}  "
+                   f"BC={float(L_b):.3e}  IC={float(L_i):.3e}")
 
-        if ep % max(1, min(20, epochs // 100 or 1)) == 0 or ep == 1 or ep == epochs:
-            el = time.perf_counter() - t0
-            cur_lr = opt.param_groups[0]["lr"]
-            emit("train", job=job_id, epoch=ep, epochs=epochs,
-                 loss_total=float(L_t), loss_pde=float(L_p),
-                 loss_bc=float(L_b), loss_ic=float(L_i),
-                 lr=float(cur_lr), elapsed=el)
-            hist["epoch"].append(ep)
-            hist["loss_total"].append(float(L_t))
-            hist["loss_pde"].append(float(L_p))
-            hist["loss_bc"].append(float(L_b))
-            hist["loss_ic"].append(float(L_i))
-            hist["lr"].append(float(cur_lr))
-            hist["elapsed"].append(el)
-        if ep % 100 == 0:
-            lg(f"Epoch {ep}/{epochs}  Total={float(L_t):.3e}  PDE={float(L_p):.3e}  "
-               f"BC={float(L_b):.3e}  IC={float(L_i):.3e}")
+        model.eval()
+        with _model_lock:
+            _model = model
 
-    model.eval()
-    with _model_lock:
-        _model = model
-    _TRAIN["active"] = False
+        if save:
+            base = os.path.dirname(os.path.abspath(__file__))
+            outp = os.path.join(base, "results", "maxwell_pinn_live.pth")
+            os.makedirs(os.path.dirname(outp), exist_ok=True)
+            torch.save(model.state_dict(), outp)
+            lg(f"Modelo guardado: {outp}")
 
-    if save:
-        base = os.path.dirname(os.path.abspath(__file__))
-        outp = os.path.join(base, "results", "maxwell_pinn_live.pth")
-        os.makedirs(os.path.dirname(outp), exist_ok=True)
-        torch.save(model.state_dict(), outp)
-        lg(f"Modelo guardado: {outp}")
-
-    return _store_result({"mode": "training", "history": hist,
-                          "wall_time": time.perf_counter() - t0})
+        return _store_result({"mode": "training", "history": hist,
+                              "wall_time": time.perf_counter() - t0})
+    finally:
+        _TRAIN["active"] = False
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -524,9 +544,17 @@ class TrainReq(BaseModel):
 
 @app.post("/api/train")
 def api_train(r: TrainReq):
-    if _TRAIN["active"]:
-        raise HTTPException(409, "Ya hay un entrenamiento activo")
-    jid = _launch("train", _target_train, r.model_dump())
+    with _train_lock:
+        if _TRAIN["active"]:
+            raise HTTPException(409, "Ya hay un entrenamiento activo — esperá a que termine "
+                                      "antes de lanzar otro.")
+        _TRAIN["active"] = True
+        _TRAIN["cancel"] = False
+    try:
+        jid = _launch("train", _target_train, r.model_dump())
+    except Exception:
+        _TRAIN["active"] = False
+        raise
     log(f"Entrenamiento PINN lanzado (job {jid}, {r.epochs} épocas)")
     return {"job_id": jid}
 
@@ -537,17 +565,18 @@ def api_train_stop():
 
 @app.get("/api/jobs/{job_id}")
 def api_job(job_id: str):
-    job = JOBS.get(job_id)
+    job = store.job_get(job_id)
     if not job:
         raise HTTPException(404, "Job no encontrado")
     return {k: job[k] for k in ("id", "type", "status", "result_id", "error")}
 
 @app.post("/api/jobs/{job_id}/cancel")
 def api_job_cancel(job_id: str):
-    job = JOBS.get(job_id)
+    job = store.job_get(job_id)
     if not job:
         raise HTTPException(404, "Job no encontrado")
-    job["cancel"] = True
+    store.job_set_cancel(job_id)
+    _cancel_flags[job_id] = True
     return {"ok": True}
 
 
@@ -555,26 +584,25 @@ def api_job_cancel(job_id: str):
 # ENDPOINTS — resultados
 # ═════════════════════════════════════════════════════════════════════════════
 def _get_result(rid: str) -> dict:
-    res = RESULTS.get(rid)
+    res = store.result_get_full(rid)
     if res is None:
         raise HTTPException(404, "Resultado no encontrado (puede haber expirado)")
     return res
 
 @app.get("/api/results/{rid}/meta")
 def result_meta(rid: str):
-    res = _get_result(rid)
-    meta = {k: v for k, v in res.items() if k != "snapshots"}
-    meta["fields"] = list(res.get("snapshots", {}).keys())
+    meta = store.result_get_meta(rid)
+    if meta is None:
+        raise HTTPException(404, "Resultado no encontrado (puede haber expirado)")
     return meta
 
 @app.get("/api/results/{rid}/frames/{field}")
 def result_frames(rid: str, field: str):
     """Frames como binario float32 little-endian, shape (K, Nx, Ny)."""
-    res = _get_result(rid)
-    snaps = res.get("snapshots", {})
-    if field not in snaps:
-        raise HTTPException(404, f"Campo '{field}' no disponible. Hay: {list(snaps)}")
-    arr = np.ascontiguousarray(snaps[field], dtype="<f4")
+    arr = store.result_get_frames(rid, field)
+    if arr is None:
+        raise HTTPException(404, f"Campo '{field}' no disponible para el resultado '{rid}'")
+    arr = np.ascontiguousarray(arr, dtype="<f4")
     K, Nx, Ny = arr.shape
     return Response(content=arr.tobytes(),
                     media_type="application/octet-stream",
@@ -583,9 +611,7 @@ def result_frames(rid: str, field: str):
 
 @app.get("/api/results")
 def results_list():
-    return {"results": [{"id": rid, "mode": r.get("mode"),
-                         "grid": r.get("grid"), "n_frames": len(r.get("times", []))}
-                        for rid, r in RESULTS.items()]}
+    return {"results": store.result_list()}
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -721,7 +747,16 @@ class GpuReq(BaseModel):
 
 @app.post("/api/gpu")
 def gpu_config(r: GpuReq):
+    # torch.set_num_threads(...) es un ajuste global del proceso — afecta a
+    # TODAS las requests en curso, no solo a quien lo pide. No se puede aislar
+    # por request sin un pool de threads por job (fuera de alcance), así que
+    # al menos evitamos que pise una simulación/entrenamiento activo de otra
+    # pestaña/usuario.
     if r.num_threads and 1 <= r.num_threads <= 64:
+        if _cancel_flags:
+            raise HTTPException(409, "Hay una simulación o entrenamiento en curso — "
+                                      "esperá a que termine antes de cambiar los hilos "
+                                      "de PyTorch (es una configuración global del proceso).")
         torch.set_num_threads(int(r.num_threads))
         log(f"Hilos de PyTorch: {r.num_threads}")
     return gpu_info()

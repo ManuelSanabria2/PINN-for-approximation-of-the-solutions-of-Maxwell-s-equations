@@ -116,6 +116,7 @@ pinn-maxwell/
 ├── comparison.py    # Comparación PINN vs FDTD en la misma malla/tiempos
 ├── exporters.py     # CSV, VTK, MATLAB, NumPy, HDF5, PNG, GIF, PDF, STL
 ├── server.py        # Backend FastAPI: jobs, WebSocket, entrenamiento en vivo, export
+├── store.py         # Persistencia: jobs/resultados en SQLite + arrays en .npz
 ├── model.py         # FCN + Fourier Feature Encoding
 ├── physics.py       # Residuales de Maxwell + función de pérdida PINN
 ├── train.py         # Entrenamiento Adam + L-BFGS
@@ -134,6 +135,19 @@ pinn-maxwell/
         ├── panels.js    # Entrenamiento, comparación 2×2, gráficas, reproductor
         └── charts.js    # Gráficas de línea + heatmaps + FFT (canvas puro)
 ```
+
+## Persistencia
+
+Los trabajos y resultados de simulación (metadatos en SQLite + campos en `.npz`) se guardan en disco y sobreviven a un reinicio del servidor — ya no hay un límite fijo de resultados en memoria.
+
+- Ruta de datos: `FLUXIA_DATA_DIR` si está definida → si no, `/data` cuando existe y es escribible (addon de pago "Persistent Storage" de Hugging Face Spaces) → si no, `pinn-maxwell/data/` dentro del contenedor.
+- **Sin el addon de HF Spaces activado**, `pinn-maxwell/data/` vive en el disco efímero del contenedor: sobrevive a caídas del proceso pero se pierde en un rebuild/redeploy completo del Space. Para persistencia real en HF Spaces, activa "Persistent Storage" (monta `/data`) — el código lo detecta automáticamente sin cambios.
+- Retención configurable con `FLUXIA_MAX_RESULTS` (por defecto 200): los resultados más viejos se purgan (fila + `.npz`) al superar el umbral, en vez de perderse silenciosamente.
+
+## Seguridad / concurrencia
+
+- **CORS**: el frontend (`demo/`) es same-origin y no necesita CORS abierto. Por defecto el backend no permite ningún origen cruzado (evita que otro sitio web use el navegador de un visitante para disparar acciones contra el servidor). Para consumir la API desde un dashboard/frontend separado, definí `FLUXIA_CORS_ORIGINS` con los orígenes permitidos, separados por coma (ej. `FLUXIA_CORS_ORIGINS=https://mi-dashboard.com`).
+- **Entrenamiento**: solo puede haber un entrenamiento activo a la vez (`/api/train` responde 409 si ya hay uno en curso), y `/api/gpu` (cambia hilos de PyTorch, configuración global del proceso) se rechaza mientras haya cualquier simulación o entrenamiento en curso, para que no pise trabajos de otras pestañas/usuarios.
 
 ## API principal
 
